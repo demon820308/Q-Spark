@@ -1,0 +1,73 @@
+name: Build & Release Portable
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Version tag to release (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Determine Release Tag
+        id: release_info
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.tag_name }}"
+          } else {
+            $tag = "${{ github.ref_name }}"
+          }
+          $rawVer = $tag.TrimStart('v')
+          Write-Output "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Output "version=$rawVer" >> $env:GITHUB_OUTPUT
+          Write-Host "Releasing version: $rawVer with tag: $tag"
+
+      - name: Build Portable Windows Package
+        shell: pwsh
+        run: |
+          python scripts/build_portable.py --version ${{ steps.release_info.outputs.version }}
+
+      - name: Create GitHub Release and Upload Portable Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: Q-Spark ${{ steps.release_info.outputs.tag }} - Windows x64 Portable
+          body: |
+            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 绿色独立便携版首发
+
+            基于 `stable-diffusion.cpp` C++ 原生引擎构建的轻量、极速本地生图工作室，内置兼容 OpenAI 的 Agent 生图接口。
+
+            ### 📦 便携版特性 (Portable Highlights)
+            - **零依赖开箱即用**：内置轻量独立 Python 3.12 绿色运行时与所有依赖，无需在系统中另外安装 Python！
+            - **完整 CUDA 加速推理**：内置完整 CUDA 12 引擎 (`sd-cli.exe`, `ggml-cuda.dll`, `cublasLt64_12.dll` 等)。
+            - **原生启动器**：内置 `Q-Spark.exe`，带专属量子闪电图标，解压后双击直接起飞！
+            - **支持模型**：
+              - Qwen-Image-2.1-Turbo (Uncensored GGUF / Viggle 6-Step INT8)
+              - Z-Image Turbo (8~9-Step S3-DiT)
+            - **Agent 生态对接**：无缝连接 Dify、Cherry Studio、Chatbox 等 AI 智能体工作流。
+
+            ### 🚀 快速上手 (Quick Start)
+            1. 下载下方的 `Q-Spark-${{ steps.release_info.outputs.version }}-windows-x64-portable.zip` 并解压；
+            2. 将您下载的模型放入 `models/` 对应子目录（或在网页设置中指向已有的 ComfyUI/models 目录）；
+            3. 双击 `Q-Spark.exe` 或 `start.bat` 即可启动并在浏览器自动打开控制台！
+          files: Q-Spark-*-windows-x64-portable.zip
+          draft: false
+          prerelease: false

@@ -1,7 +1,8 @@
 {
-  "models_dir": "E:\\image2\\models",
-  "api_diff_model": "z_image_turbo_int8_convrot.safetensors",
-  "api_te_model": "qwen_3_4b.safetensors",
-  "api_vae_model": "ae.safetensors",
-  "api_steps": 9
+  "models_dir": "models",
+  "outputs_dir": "outputs",
+  "api_diff_model": "Qwen-Image-2.1-Turbo-AD-Q4_K.gguf",
+  "api_te_model": "Qwen-Image-2.1-Turbo-Abliterated-Uncensored-AD-Q4_K.gguf",
+  "api_vae_model": "qwen_image_2.1_vae_bf16.safetensors",
+  "api_steps": 8
 }

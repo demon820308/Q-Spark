@@ -12,6 +12,7 @@ models/**
 # 大型编译二进制与加速 DLL（超过 GitHub 100MB 单文件限制，便携版请通过 Release 下载）
 bin/
 build_portable/
+build_portable_staging/
 python_embeded/
 *.zip
 *.tar.gz

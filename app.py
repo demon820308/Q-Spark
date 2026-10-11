@@ -36,19 +36,33 @@ from pydantic import BaseModel, ConfigDict
 # ==============================================================================
 BASE_DIR = Path(__file__).resolve().parent
 BIN_DIR = BASE_DIR / "bin"
-OUTPUTS_DIR = BASE_DIR / "outputs"
-OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-
 CONFIG_FILE = BASE_DIR / "config.json"
 
+def to_rel_or_abs(p: Path | str) -> str:
+    """如果路径在工程根目录下，返回相对路径；否则返回原始路径"""
+    try:
+        resolved = Path(p).resolve()
+        return str(resolved.relative_to(BASE_DIR))
+    except (ValueError, RuntimeError):
+        return str(p)
+
 def load_config() -> dict:
+    default_cfg = {
+        "models_dir": "models",
+        "outputs_dir": "outputs",
+        "api_diff_model": "Qwen-Image-2.1-Turbo-AD-Q4_K.gguf",
+        "api_te_model": "Qwen-Image-2.1-Turbo-Abliterated-Uncensored-AD-Q4_K.gguf",
+        "api_vae_model": "qwen_image_2.1_vae_bf16.safetensors",
+        "api_steps": 8,
+    }
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                loaded = json.load(f)
+                default_cfg.update(loaded)
         except Exception:
             pass
-    return {"models_dir": str(BASE_DIR / "models")}
+    return default_cfg
 
 def save_config(cfg: dict):
     try:
@@ -58,7 +72,13 @@ def save_config(cfg: dict):
         print(f"[Warning] 写入 config.json 失败: {e}")
 
 APP_CONFIG = load_config()
-MODELS_DIR = Path(APP_CONFIG.get("models_dir", str(BASE_DIR / "models")))
+
+_raw_models = APP_CONFIG.get("models_dir", "models")
+MODELS_DIR = Path(_raw_models) if Path(_raw_models).is_absolute() else (BASE_DIR / _raw_models).resolve()
+
+_raw_outputs = APP_CONFIG.get("outputs_dir", "outputs")
+OUTPUTS_DIR = Path(_raw_outputs) if Path(_raw_outputs).is_absolute() else (BASE_DIR / _raw_outputs).resolve()
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_api_model_status_text() -> str:
     saved_m = APP_CONFIG.get("api_diff_model")
@@ -330,9 +350,9 @@ class InferenceEngine:
 
         cmd = [
             str(SD_SERVER_EXE),
-            "--diffusion-model", str(diff_path),
-            "--llm", str(te_path),
-            "--vae", str(vae_path),
+            "--diffusion-model", to_rel_or_abs(diff_path),
+            "--llm", to_rel_or_abs(te_path),
+            "--vae", to_rel_or_abs(vae_path),
             "--listen-ip", "127.0.0.1",
             "--listen-port", str(self.server_port),
             "--sigmas", TURBO_SIGMAS,
@@ -392,9 +412,9 @@ class InferenceEngine:
 
             cmd = [
                 str(SD_CLI_EXE),
-                "--diffusion-model", str(diff_path),
-                "--llm", str(te_path),
-                "--vae", str(vae_path),
+                "--diffusion-model", to_rel_or_abs(diff_path),
+                "--llm", to_rel_or_abs(te_path),
+                "--vae", to_rel_or_abs(vae_path),
                 "-p", prompt,
                 "--steps", str(steps),
                 "--cfg-scale", str(DEFAULT_CFG),
@@ -403,7 +423,7 @@ class InferenceEngine:
                 "-H", str(height),
                 "-s", str(seed),
                 "--diffusion-fa",
-                "-o", str(out_filepath),
+                "-o", to_rel_or_abs(out_filepath),
             ]
             if steps == 6 or "6step" in (diff_model or "").lower():
                 cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
@@ -1077,7 +1097,7 @@ with gr.Blocks(title="Q-Spark Studio") as demo:
             with gr.Accordion("⚙️ 模型与显存策略高级设置", open=False):
                 with gr.Row():
                     models_dir_input = gr.Textbox(
-                        value=str(MODELS_DIR),
+                        value=to_rel_or_abs(MODELS_DIR),
                         label="📁 模型库根目录路径 (支持直接指向 ComfyUI 的 models 目录)",
                         lines=1,
                         scale=8,
@@ -1262,7 +1282,7 @@ with gr.Blocks(title="Q-Spark Studio") as demo:
                 )
 
             cost = time.time() - start_t
-            info_text = f"✨ **生成成功**！耗时: `{cost:.2f}s` | 分辨率: `{w}x{h}`"
+            info_text = f"✨ **生成成功**！耗时: `{cost:.2f}s` | 分辨率: `{w}x{h}` | 存放目录: `{to_rel_or_abs(OUTPUTS_DIR)}/`"
             yield (
                 final_path,
                 info_text,
@@ -1283,16 +1303,23 @@ with gr.Blocks(title="Q-Spark Studio") as demo:
     def on_rescan_models(custom_path):
         global MODELS_DIR, APP_CONFIG
         p_str = custom_path.strip() if custom_path else ""
-        p = Path(p_str) if p_str else BASE_DIR / "models"
+        if p_str:
+            p = Path(p_str)
+            if not p.is_absolute():
+                p = (BASE_DIR / p).resolve()
+        else:
+            p = (BASE_DIR / "models").resolve()
+
         if not p.exists() or not p.is_dir():
             return (
+                gr.update(),
                 gr.update(),
                 gr.update(),
                 gr.update(),
                 f"❌ 路径不存在或不是有效文件夹: `{p}`",
             )
         MODELS_DIR = p
-        APP_CONFIG["models_dir"] = str(p)
+        APP_CONFIG["models_dir"] = to_rel_or_abs(p)
         save_config(APP_CONFIG)
 
         d_list, t_list, v_list = scan_models(MODELS_DIR)
@@ -1300,7 +1327,8 @@ with gr.Blocks(title="Q-Spark Studio") as demo:
         t_val = t_list[0] if t_list else None
         v_val = v_list[0] if v_list else None
         s_val = 6 if d_val and "6step" in d_val.lower() else 8
-        msg = f"✅ 模型目录已同步并持久化保存: `{p}`\n发现主模型: {len(d_list)} 个 | 文本编码器: {len(t_list)} 个 | VAE: {len(v_list)} 个"
+        display_path = to_rel_or_abs(p)
+        msg = f"✅ 模型目录已同步并持久化保存: `{display_path}`\n发现主模型: {len(d_list)} 个 | 文本编码器: {len(t_list)} 个 | VAE: {len(v_list)} 个"
         return (
             gr.update(choices=d_list, value=d_val),
             gr.update(choices=t_list, value=t_val),
