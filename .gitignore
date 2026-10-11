@@ -1,0 +1,42 @@
+# 模型文件与权重目录（体积巨大，严禁上传 Git）
+models/
+models/**
+*.safetensors
+*.gguf
+*.bin
+*.pth
+*.pt
+*.onnx
+*.crdownload
+
+# 大型编译二进制与加速 DLL（超过 GitHub 100MB 单文件限制，便携版请通过 Release 下载）
+bin/
+build_portable/
+python_embeded/
+*.zip
+*.tar.gz
+*.7z
+
+# 本地生图输出目录与缓存
+outputs/
+*.png
+*.jpg
+*.jpeg
+*.webp
+!assets/*.png
+!assets/*.jpg
+!docs/**
+
+# Python 缓存与虚拟环境
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+*.log
+
+# 快捷方式与本地临时文件
+*.lnk
+*.bak
+python-embed.zip

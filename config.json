@@ -1,0 +1,7 @@
+{
+  "models_dir": "E:\\image2\\models",
+  "api_diff_model": "z_image_turbo_int8_convrot.safetensors",
+  "api_te_model": "qwen_3_4b.safetensors",
+  "api_vae_model": "ae.safetensors",
+  "api_steps": 9
+}
