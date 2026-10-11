@@ -340,9 +340,26 @@ class InferenceEngine:
             err_msg = "".join(error_lines[-15:])
             raise RuntimeError(f"sd-cli 执行失败 (代码 {ret}):\n{err_msg}")
 
-    async def ensure_server(self, diff_model: str, te_model: str, vae_model: str):
+    async def ensure_server(
+        self,
+        diff_model: str,
+        te_model: str,
+        vae_model: str,
+        steps: Optional[int] = None,
+        width: int = 1024,
+        height: int = 1024,
+    ):
+        target_steps = int(steps) if (steps is not None and int(steps) > 0) else (6 if "6step" in (diff_model or "").lower() else DEFAULT_STEPS)
+
+        target_config = {
+            "diff": diff_model,
+            "te": te_model,
+            "vae": vae_model,
+            "steps": target_steps,
+        }
+
         if self.server_process and self.server_process.poll() is None:
-            if self.current_model_config == {"diff": diff_model, "te": te_model, "vae": vae_model}:
+            if self.current_model_config == target_config:
                 return True
             self.stop_server()
 
@@ -357,15 +374,19 @@ class InferenceEngine:
             "--vae", to_rel_or_abs(vae_path),
             "--listen-ip", "127.0.0.1",
             "--listen-port", str(self.server_port),
-            "--sigmas", TURBO_SIGMAS,
-            "--steps", str(DEFAULT_STEPS),
+            "--steps", str(target_steps),
             "--cfg-scale", str(DEFAULT_CFG),
             "--sampling-method", DEFAULT_SAMPLER,
+            "-s", "-1",
             "--diffusion-fa",
         ]
+        if target_steps == 6:
+            cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
+        elif target_steps == 8:
+            cmd.extend(["--sigmas", TURBO_SIGMAS])
 
         self.server_process = subprocess.Popen(cmd, cwd=str(BASE_DIR))
-        self.current_model_config = {"diff": diff_model, "te": te_model, "vae": vae_model}
+        self.current_model_config = target_config
 
         for _ in range(90):
             await asyncio.sleep(1)
@@ -402,7 +423,7 @@ class InferenceEngine:
             vae_model = vae_model or APP_CONFIG.get("api_vae_model") or vae_list[0]
 
             if steps is None or int(steps) <= 0:
-                steps = APP_CONFIG.get("api_steps") or (6 if "6step" in diff_model.lower() else DEFAULT_STEPS)
+                steps = 6 if "6step" in (diff_model or "").lower() else (APP_CONFIG.get("api_steps") or DEFAULT_STEPS)
             steps = int(steps)
 
             out_filename = f"img_{int(time.time())}_{seed}.png"
@@ -427,7 +448,7 @@ class InferenceEngine:
                 "--diffusion-fa",
                 "-o", to_rel_or_abs(out_filepath),
             ]
-            if steps == 6 or "6step" in (diff_model or "").lower():
+            if steps == 6:
                 cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
             elif steps == 8:
                 cmd.extend(["--sigmas", TURBO_SIGMAS])
@@ -442,7 +463,7 @@ class InferenceEngine:
             # 策略 B & C：常驻或自动休眠模式
             try:
                 yield {"pct": 0.15, "desc": "准备常驻推理服务...", "log": ">>> 正在连接常驻模型服务...\n"}
-                await self.ensure_server(diff_model, te_model, vae_model)
+                await self.ensure_server(diff_model, te_model, vae_model, steps=steps, width=width, height=height)
                 yield {"pct": 0.45, "desc": "服务已就绪，正在进行 GPU 高速去噪...", "log": ">>> 开始发送生图任务...\n"}
                 async with httpx.AsyncClient(timeout=300.0) as client:
                     resp = await client.post(
