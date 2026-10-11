@@ -35,6 +35,8 @@ from pydantic import BaseModel, ConfigDict
 # 1. 基础路径与全局配置
 # ==============================================================================
 BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 BIN_DIR = BASE_DIR / "bin"
 CONFIG_FILE = BASE_DIR / "config.json"
 
@@ -1412,4 +1414,4 @@ if __name__ == "__main__":
     print("Web 交互界面: http://127.0.0.1:40188")
     print("Agent 接口地址: http://127.0.0.1:40188/v1/images/generations")
     print("=" * 60 + "\n")
-    uvicorn.run("app:app", host="0.0.0.0", port=40188, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=40188)

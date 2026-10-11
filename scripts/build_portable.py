@@ -115,6 +115,7 @@ def ensure_python_embeded(py_dir: str, root_dir: str):
             else:
                 new_lines.append(line)
         new_lines.append(".")
+        new_lines.append("..")
         new_lines.append(r"Lib\site-packages")
         with open(pth_file, "w", encoding="utf-8") as f:
             f.write("\n".join(new_lines) + "\n")
