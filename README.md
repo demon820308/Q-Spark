@@ -35,7 +35,7 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 No Python installation required. No dependencies or build tools needed.
 
-1. Download **`Q-Spark-0.1.0-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
+1. Download **`Q-Spark-0.1.1-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
 2. Extract the archive to any folder on your computer.
 3. Download your preferred models and place them into the `models/` directory (see [Models Catalog](#models-catalog) below).
 4. Double-click **`start.bat`** (or run `创建桌面快捷方式.bat` to create a Desktop shortcut).

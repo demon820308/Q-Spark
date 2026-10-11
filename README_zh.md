@@ -35,7 +35,7 @@
 
 无需安装 Python，无需配置环境或下载 pip 依赖包，解压即用！
 
-1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.1.0-windows-x64-portable.zip`**；
+1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.1.1-windows-x64-portable.zip`**；
 2. 解压到电脑上的任意文件夹；
 3. 将下载好的模型放入 `models/` 对应子目录中（详见下方 [模型库与目录规范](#模型库与目录规范)）；
 4. 双击运行 **`start.bat`**（或运行 `创建桌面快捷方式.bat` 生成桌面图标后双击）；

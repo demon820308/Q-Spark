@@ -572,27 +572,53 @@ ASPECT_RATIO_PRESETS = {
     "21:9": (1536, 640),
 }
 
+def _extract_from_text(text: Optional[str]) -> Optional[tuple[int, int]]:
+    """从文本中提取尺寸或比例：支持 --ar 16:9、1792x1024、1024*1792、16:9、1:1 等"""
+    if not text:
+        return None
+    s = text.strip()
+
+    # 1. 优先提取显式 --ar X:Y 语法 (如 --ar 16:9, -ar 9:16, --ar 16/9, --ar 16：9)
+    m_ar = re.search(r'--?ar\s+(\d+[:/：]\d+)', s, re.IGNORECASE)
+    if m_ar:
+        r = m_ar.group(1).replace("/", ":").replace("：", ":")
+        if r in ASPECT_RATIO_PRESETS:
+            return ASPECT_RATIO_PRESETS[r]
+
+    # 2. 提取显式分辨率: 1792x1024, 1024*1792, 1024x1024, 1024*1024, 1792*1024 等
+    m_dim = re.search(r'(?<!\d)(\d{3,4})\s*[\*xX×]\s*(\d{3,4})(?!\d)', s)
+    if m_dim:
+        try:
+            w = int(m_dim.group(1))
+            h = int(m_dim.group(2))
+            w = max(256, min(2048, round(w / 16) * 16))
+            h = max(256, min(2048, round(h / 16) * 16))
+            return w, h
+        except Exception:
+            pass
+
+    # 3. 提取独立比例预设: 1:1, 16:9, 9:16, 4:3, 3:4, 2:3, 3:2, 21:9 等
+    for m_ratio in re.finditer(r'(?<!\d)(\d{1,2})\s*[:/：]\s*(\d{1,2})(?!\d)', s):
+        ratio_key = f"{m_ratio.group(1)}:{m_ratio.group(2)}"
+        if ratio_key in ASPECT_RATIO_PRESETS:
+            return ASPECT_RATIO_PRESETS[ratio_key]
+
+    return None
+
 def resolve_dimensions(size_str: Optional[str] = None, prompt_str: str = "") -> tuple[int, int]:
-    """智能解析尺寸与比例：支持 '1360x768' 分辨率、'16:9' 比例别名、或 prompt 中 '--ar 16:9' 语法"""
+    """智能解析尺寸与比例：支持分辨率 (1792x1024 / 1024*1792)、比例 (16:9, 9:16, 1:1, 4:3, 3:4) 以及 --ar 16:9"""
+    # 1. 优先提取 prompt 中显式指定的比例/分辨率 (用户本次输入的具体意图)
+    dim_from_prompt = _extract_from_text(prompt_str)
+    if dim_from_prompt:
+        return dim_from_prompt
+
+    # 2. 若 prompt 未指定，则提取 size 参数中的尺寸或比例
     if size_str:
-        s = size_str.strip().lower()
-        if s in ASPECT_RATIO_PRESETS:
-            return ASPECT_RATIO_PRESETS[s]
-        if "x" in s or "*" in s:
-            sep = "x" if "x" in s else "*"
-            try:
-                parts = s.split(sep)
-                return int(parts[0].strip()), int(parts[1].strip())
-            except Exception:
-                pass
+        dim_from_size = _extract_from_text(size_str)
+        if dim_from_size:
+            return dim_from_size
 
-    if prompt_str:
-        m = re.search(r'--?ar\s+(\d+[:/]\d+)', prompt_str, re.IGNORECASE)
-        if m:
-            r = m.group(1).replace("/", ":")
-            if r in ASPECT_RATIO_PRESETS:
-                return ASPECT_RATIO_PRESETS[r]
-
+    # 3. 兜底默认 1024x1024
     return 1024, 1024
 
 @app.post("/v1/images/generations")
