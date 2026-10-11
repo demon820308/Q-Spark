@@ -2,21 +2,18 @@
 @chcp 65001 >nul 2>nul
 @pushd "%~dp0"
 
-echo ========================================================
-echo   Q-Spark Studio (Port: 40188)
-echo ========================================================
-echo.
-echo Starting Studio Server...
-echo Web UI:    http://127.0.0.1:40188
-echo Agent API: http://127.0.0.1:40188/v1/images/generations
-echo.
-echo [提示] 服务启动完成后，将自动在浏览器打开 Web 界面...
-echo.
+taskkill /F /IM sd-server.exe /T >nul 2>nul
+taskkill /F /IM sd-cli.exe /T >nul 2>nul
+
 if exist "%~dp0python_embeded\python.exe" (
-    set "PYTHON_CMD=%~dp0python_embeded\python.exe"
+    "%~dp0python_embeded\python.exe" -s app.py
 ) else (
-    set "PYTHON_CMD=python"
+    python app.py
 )
 
-"%PYTHON_CMD%" app.py
+if %ERRORLEVEL% neq 0 (
+    echo.
+    echo If you see this and Q-Spark Studio did not start try updating your Nvidia Drivers to the latest.
+    echo If you get a dll error you need to install vc redist that you can find: https://aka.ms/vc14/vc_redist.x64.exe
+)
 pause

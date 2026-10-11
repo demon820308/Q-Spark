@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Spark Studio</title>
+    <link rel="icon" href="/app.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+
+    <!-- 顶部导航条 -->
+    <header class="dark-header">
+        <div>
+            <div class="dark-title">Q-Spark Studio</div>
+            <div class="dark-subtitle">生图控制台 · stable-diffusion.cpp 引擎 · 支持 Agent API</div>
+        </div>
+        <div class="header-actions">
+            <span class="vram-badge" id="vram-status-text">显存状态：检测中...</span>
+            <button class="btn-flush" id="flush-btn">⚡ 立即清空显存 (Flush VRAM)</button>
+        </div>
+    </header>
+
+    <!-- 硬件指标监控卡片 -->
+    <section class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-row">
+                <span>🎮 GPU 显存 (VRAM)</span>
+                <span class="metric-val" id="metric-vram-text">-- / -- GB</span>
+            </div>
+            <div class="metric-progress-bg">
+                <div class="metric-progress-bar bar-normal" id="metric-vram-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-row">
+                <span>💾 物理内存 (RAM)</span>
+                <span class="metric-val" id="metric-ram-text">-- / -- GB</span>
+            </div>
+            <div class="metric-progress-bg">
+                <div class="metric-progress-bar bar-normal" id="metric-ram-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-row">
+                <span>⚡ 处理器占用 (CPU)</span>
+                <span class="metric-val" id="metric-cpu-text">--%</span>
+            </div>
+            <div class="metric-progress-bg">
+                <div class="metric-progress-bar bar-normal" id="metric-cpu-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 主工作区 -->
+    <main class="workspace-grid">
+        <!-- 左侧输入与控制面板 -->
+        <div class="card">
+            <div class="form-group">
+                <label for="prompt-input">提示词 (Prompt)</label>
+                <textarea id="prompt-input" rows="5" placeholder="输入希望生成的画面描述（支持中英文，已去除所有审查限制）..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>画幅比例快捷预设（直接点击切换）</label>
+                <div class="preset-radio-grid" id="preset-container">
+                    <div class="preset-pill active" data-w="1024" data-h="1024">1:1 (1024x1024)</div>
+                    <div class="preset-pill" data-w="768" data-h="1024">3:4 (768x1024)</div>
+                    <div class="preset-pill" data-w="864" data-h="1152">3:4 (864x1152)</div>
+                    <div class="preset-pill" data-w="768" data-h="1360">9:16 (768x1360)</div>
+                    <div class="preset-pill" data-w="832" data-h="1248">2:3 (832x1248)</div>
+                    <div class="preset-pill" data-w="1024" data-h="768">4:3 (1024x768)</div>
+                    <div class="preset-pill" data-w="1360" data-h="768">16:9 (1360x768)</div>
+                    <div class="preset-pill" data-w="1248" data-h="832">3:2 (1248x832)</div>
+                    <div class="preset-pill" data-w="1536" data-h="640">21:9 (1536x640)</div>
+                    <div class="preset-pill" data-w="512" data-h="512">1:1 (512x512)</div>
+                </div>
+            </div>
+
+            <!-- 高级设置手风琴 -->
+            <details id="advanced-details">
+                <summary>⚙️ 模型与显存策略高级设置</summary>
+                <div class="details-body">
+                    <div class="form-group">
+                        <label>📁 模型库预设管理 (下拉切换预设 / 添加新路径 / 快速删除)</label>
+                        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                            <select id="models-dir-select" style="flex: 1;"></select>
+                            <button class="btn-secondary" id="rescan-btn" title="切换到此目录并扫描">🔄 切换扫描</button>
+                            <button class="btn-secondary" id="del-dir-btn" title="删除选中的预设" style="color: #ff6b6b;">🗑️ 删除</button>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="models-dir-input" placeholder="输入新的模型库绝对或相对路径 (如 D:\models 或 ComfyUI\models)..." style="flex: 1;">
+                            <button class="btn-secondary" id="add-dir-btn">➕ 添加新预设</button>
+                        </div>
+                    </div>
+
+                    <!-- 模型下载说明文档 (懒加载) -->
+                    <details id="doc-details">
+                        <summary>📖 模型下载说明文档</summary>
+                        <div class="details-body markdown-doc" id="doc-content">
+                            <em>加载中...</em>
+                        </div>
+                    </details>
+
+                    <div class="form-group">
+                        <label for="diff-select">降噪主模型 (diffusion_models)</label>
+                        <select id="diff-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="te-select">文本编码器 (text_encoders)</label>
+                        <select id="te-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vae-select">变分自编码器 (vae)</label>
+                        <select id="vae-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>显存管理策略</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="policy" value="on_demand" checked>
+                                ⚡ 即用即走 (On-Demand 冷启动 / 推荐10G显卡 / 100%纯GPU绝不降级)
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="policy" value="auto_unload">
+                                ⏳ 智能休眠 (5分钟闲置自动释放 / 需16G+显存)
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="policy" value="always_on">
+                                🚀 显存常驻 (Always-On 秒级响应 / 需16G+显存，10G卡勿选)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="steps-input">采样步数 (Steps)</label>
+                            <input type="number" id="steps-input" value="8" min="1" max="50">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="seed-input">随机种子 (-1 为随机)</label>
+                            <input type="number" id="seed-input" value="-1">
+                        </div>
+                    </div>
+
+                    <button class="btn-secondary" id="save-api-btn" style="width: 100%; margin-top: 4px;">
+                        💾 保存为 API / Agent 默认调用模型 (Save for Agent)
+                    </button>
+                    <div id="api-model-info" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px;"></div>
+                </div>
+            </details>
+
+            <!-- 生成按钮与动态进度条 -->
+            <button class="btn-coral" id="generate-btn">开始生成图像 (Generate)</button>
+            <div class="gen-progress-wrapper" id="progress-wrapper">
+                <div class="metric-row" style="margin-top: 8px;">
+                    <span id="progress-desc" style="font-size: 0.82rem; color: var(--text-muted);">正在初始化...</span>
+                    <span id="progress-pct" class="metric-val" style="font-size: 0.82rem;">0%</span>
+                </div>
+                <div class="gen-progress-bar-bg">
+                    <div class="gen-progress-bar-fill" id="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧画布与信息卡片 -->
+        <div class="card canvas-card">
+            <div class="image-preview-container" id="preview-box">
+                <div class="image-placeholder" id="placeholder-text">🖼️ 生成的图像将在此展示</div>
+                <img id="result-image" src="" alt="生成结果" style="display: none;">
+            </div>
+            <div class="gen-status-box" id="gen-info-box">准备就绪。</div>
+        </div>
+    </main>
+
+    <!-- 底部日志终端与 Agent 接入指南 -->
+    <footer class="bottom-grid">
+        <div class="terminal-card">
+            <div class="terminal-title">📟 实时执行进度日志 (Live Logs)</div>
+            <div class="terminal-logs" id="terminal-logs">等待生成指令...</div>
+        </div>
+        <div class="terminal-card">
+            <div class="terminal-title">🔌 外部 Agent 接入指南</div>
+            <div class="agent-guide-content">
+                本服务对外暴露标准的 <strong>OpenAI DALL-E 生图接口</strong>：
+                <ul style="margin: 6px 0 8px 18px;">
+                    <li><strong>Base URL</strong>: <code>http://127.0.0.1:40188/v1</code></li>
+                    <li><strong>API Key</strong>: 任意填写（如 <code>sk-local</code>）</li>
+                    <li><strong>模型名称</strong>: <code>qwen-image-2.1-turbo</code> 或 <code>dall-e-3</code></li>
+                </ul>
+                <pre>curl -X POST http://127.0.0.1:40188/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "a cyberpunk street, neon, 8k", "size": "1024x1024"}'</pre>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 全局居中深色模态弹窗 -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div id="modal-title" class="modal-title">提示</div>
+            <div id="modal-msg" class="modal-msg"></div>
+            <div class="modal-actions">
+                <button id="modal-cancel-btn" class="btn-secondary" style="display: none; padding: 8px 20px;">取消</button>
+                <button id="modal-ok-btn" class="btn-primary" style="padding: 8px 24px;">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 前端交互逻辑 -->
+    <script>
+        let currentW = 1024;
+        let currentH = 1024;
+        let isGenerating = false;
+        let logLines = ["等待生成指令...\n"];
+        let docLoaded = false;
+
+        // 简易 Markdown 解析器 (用于说明文档)
+        function renderMarkdown(md) {
+            let html = md
+                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^---$/gim, '<hr>')
+                .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank">$1</a>')
+                .replace(/`([^`]+)`/gim, '<code>$1</code>')
+                .replace(/^- (.*$)/gim, '<li>$1</li>');
+
+            // 表格转换
+            const lines = html.split('\n');
+            let inTable = false;
+            let tableHtml = '';
+            let newLines = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line.startsWith('|') && line.endsWith('|')) {
+                    if (!inTable) {
+                        inTable = true;
+                        tableHtml = '<table>';
+                        const cells = line.split('|').slice(1, -1);
+                        tableHtml += '<thead><tr>' + cells.map(c => `<th>${c.trim()}</th>`).join('') + '</tr></thead><tbody>';
+                    } else if (line.includes('---')) {
+                        // 表头分隔行忽略
+                    } else {
+                        const cells = line.split('|').slice(1, -1);
+                        tableHtml += '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
+                    }
+                } else {
+                    if (inTable) {
+                        tableHtml += '</tbody></table>';
+                        newLines.push(tableHtml);
+                        inTable = false;
+                    }
+                    newLines.push(lines[i]);
+                }
+            }
+            if (inTable) {
+                tableHtml += '</tbody></table>';
+                newLines.push(tableHtml);
+            }
+            return newLines.join('\n');
+        }
+
+        // 采集系统硬件指标
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/api/metrics');
+                if (!res.ok) return;
+                const m = await res.json();
+
+                // VRAM
+                const vram = m.vram || {used: 0, total: 10, pct: 0};
+                document.getElementById('metric-vram-text').innerText = `${vram.used} / ${vram.total} GB (${vram.pct}%)`;
+                const vBar = document.getElementById('metric-vram-bar');
+                vBar.style.width = `${Math.min(100, vram.pct)}%`;
+                vBar.className = 'metric-progress-bar ' + (vram.pct >= 88 ? 'bar-danger' : vram.pct >= 75 ? 'bar-warn' : 'bar-normal');
+
+                // RAM
+                const ram = m.ram || {used: 0, total: 16, pct: 0};
+                document.getElementById('metric-ram-text').innerText = `${ram.used} / ${ram.total} GB (${ram.pct}%)`;
+                const rBar = document.getElementById('metric-ram-bar');
+                rBar.style.width = `${Math.min(100, ram.pct)}%`;
+                rBar.className = 'metric-progress-bar ' + (ram.pct >= 88 ? 'bar-danger' : ram.pct >= 75 ? 'bar-warn' : 'bar-normal');
+
+                // CPU
+                const cpu = m.cpu || {pct: 0};
+                document.getElementById('metric-cpu-text').innerText = `${cpu.pct}%`;
+                const cBar = document.getElementById('metric-cpu-bar');
+                cBar.style.width = `${Math.min(100, cpu.pct)}%`;
+                cBar.className = 'metric-progress-bar ' + (cpu.pct >= 88 ? 'bar-danger' : cpu.pct >= 75 ? 'bar-warn' : 'bar-normal');
+            } catch (e) {}
+        }
+
+        // 全局居中弹窗封装 (替换浏览器原生置顶 alert / confirm)
+        function showAlert(msg, title = "提示") {
+            return new Promise(resolve => {
+                document.getElementById('modal-title').innerText = title;
+                document.getElementById('modal-msg').innerText = msg;
+                document.getElementById('modal-cancel-btn').style.display = 'none';
+                const okBtn = document.getElementById('modal-ok-btn');
+                okBtn.innerText = "确定";
+                const overlay = document.getElementById('custom-modal');
+                overlay.classList.add('active');
+                
+                okBtn.onclick = () => {
+                    overlay.classList.remove('active');
+                    resolve(true);
+                };
+            });
+        }
+
+        function showConfirm(msg, title = "操作确认") {
+            return new Promise(resolve => {
+                document.getElementById('modal-title').innerText = title;
+                document.getElementById('modal-msg').innerText = msg;
+                const cancelBtn = document.getElementById('modal-cancel-btn');
+                cancelBtn.style.display = 'inline-block';
+                const okBtn = document.getElementById('modal-ok-btn');
+                okBtn.innerText = "确定";
+                const overlay = document.getElementById('custom-modal');
+                overlay.classList.add('active');
+                
+                cancelBtn.onclick = () => {
+                    overlay.classList.remove('active');
+                    resolve(false);
+                };
+                okBtn.onclick = () => {
+                    overlay.classList.remove('active');
+                    resolve(true);
+                };
+            });
+        }
+
+        window.alert = (msg) => showAlert(msg);
+
+        function populateDirSelect(historyList, currentDir) {
+            const sel = document.getElementById('models-dir-select');
+            sel.innerHTML = '';
+            (historyList || []).forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.text = d;
+                if (d === currentDir) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            if (!sel.value && historyList && historyList.length > 0) {
+                sel.value = historyList[0];
+            }
+        }
+
+        // 初始化加载配置与模型
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                document.getElementById('vram-status-text').innerText = `显存状态：${data.status_text}`;
+                document.getElementById('api-model-info').innerText = data.api_status_text;
+                populateDirSelect(data.models_dir_history, data.models_dir);
+
+                // 填充下拉框
+                populateSelect('diff-select', data.diff_choices, data.config.api_diff_model);
+                populateSelect('te-select', data.te_choices, data.config.api_te_model);
+                populateSelect('vae-select', data.vae_choices, data.config.api_vae_model);
+
+                // 显存策略
+                const policy = data.engine_mode || 'on_demand';
+                const radio = document.querySelector(`input[name="policy"][value="${policy}"]`);
+                if (radio) radio.checked = true;
+
+                // 步数匹配
+                updateStepsSuggestion();
+            } catch (e) {
+                console.error("加载配置失败:", e);
+            }
+        }
+
+        function populateSelect(id, choices, selectedVal) {
+            const sel = document.getElementById(id);
+            sel.innerHTML = '';
+            if (!choices || choices.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.text = '⚠️ (该目录下未扫描到可用模型)';
+                sel.appendChild(opt);
+                return;
+            }
+            choices.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.text = c;
+                if (c === selectedVal) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            if (!sel.value && choices.length > 0) sel.value = choices[0];
+        }
+
+        function updateStepsSuggestion() {
+            const diffM = document.getElementById('diff-select').value || '';
+            const stepsInput = document.getElementById('steps-input');
+            if (diffM.toLowerCase().includes('6step')) {
+                stepsInput.value = 6;
+            } else {
+                stepsInput.value = 8;
+            }
+        }
+
+        document.getElementById('diff-select').addEventListener('change', updateStepsSuggestion);
+
+        // 药丸预设切换
+        document.querySelectorAll('.preset-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                currentW = parseInt(pill.dataset.w);
+                currentH = parseInt(pill.dataset.h);
+            });
+        });
+
+        // 懒加载说明文档
+        document.getElementById('doc-details').addEventListener('toggle', async (e) => {
+            if (e.target.open && !docLoaded) {
+                try {
+                    const res = await fetch('/api/docs/models');
+                    const data = await res.json();
+                    document.getElementById('doc-content').innerHTML = renderMarkdown(data.content);
+                    docLoaded = true;
+                } catch (err) {
+                    document.getElementById('doc-content').innerText = "加载说明文档失败。";
+                }
+            }
+        });
+
+        // 切换并重新扫描选中的预设目录
+        document.getElementById('rescan-btn').addEventListener('click', async () => {
+            const sel = document.getElementById('models-dir-select');
+            const dir = sel.value;
+            if (!dir) return;
+            const btn = document.getElementById('rescan-btn');
+            btn.disabled = true;
+            btn.innerText = "扫描中...";
+            try {
+                const res = await fetch('/api/models/scan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({models_dir: dir})
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "扫描失败");
+
+                populateDirSelect(data.models_dir_history, data.models_dir);
+                populateSelect('diff-select', data.diff_choices);
+                populateSelect('te-select', data.te_choices);
+                populateSelect('vae-select', data.vae_choices);
+                updateStepsSuggestion();
+                alert(data.message);
+            } catch (err) {
+                alert("扫描失败: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "🔄 切换扫描";
+            }
+        });
+
+        // 下拉选择改变时自动触发切换与重新扫描
+        document.getElementById('models-dir-select').addEventListener('change', () => {
+            document.getElementById('rescan-btn').click();
+        });
+
+        // 添加新预设目录
+        document.getElementById('add-dir-btn').addEventListener('click', async () => {
+            const input = document.getElementById('models-dir-input');
+            const dir = input.value.trim();
+            if (!dir) {
+                alert("请输入有效的目录路径！");
+                return;
+            }
+            const btn = document.getElementById('add-dir-btn');
+            btn.disabled = true;
+            btn.innerText = "添加中...";
+            try {
+                const res = await fetch('/api/models/scan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({models_dir: dir})
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "添加失败");
+
+                input.value = "";
+                populateDirSelect(data.models_dir_history, data.models_dir);
+                populateSelect('diff-select', data.diff_choices);
+                populateSelect('te-select', data.te_choices);
+                populateSelect('vae-select', data.vae_choices);
+                updateStepsSuggestion();
+                alert("✅ 已成功添加并切换至新模型库！\n" + data.message);
+            } catch (err) {
+                alert("添加失败: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "➕ 添加新预设";
+            }
+        });
+
+        // 删除当前选中的预设目录
+        document.getElementById('del-dir-btn').addEventListener('click', async () => {
+            const sel = document.getElementById('models-dir-select');
+            const target = sel.value;
+            if (!target) return;
+            if (!await showConfirm(`确定要从预设列表中删除该目录吗？\n${target}`)) return;
+
+            const btn = document.getElementById('del-dir-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/models/preset/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({models_dir: target})
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "删除失败");
+
+                populateDirSelect(data.models_dir_history, data.models_dir);
+                populateSelect('diff-select', data.diff_choices);
+                populateSelect('te-select', data.te_choices);
+                populateSelect('vae-select', data.vae_choices);
+                updateStepsSuggestion();
+                alert(data.message);
+            } catch (err) {
+                alert("删除失败: " + err.message);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // 保存默认配置
+        document.getElementById('save-api-btn').addEventListener('click', async () => {
+            const payload = {
+                diff_model: document.getElementById('diff-select').value,
+                te_model: document.getElementById('te-select').value,
+                vae_model: document.getElementById('vae-select').value,
+                steps: parseInt(document.getElementById('steps-input').value),
+                policy: document.querySelector('input[name="policy"]:checked').value
+            };
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                document.getElementById('api-model-info').innerText = data.api_status_text;
+                alert(data.message);
+            } catch (err) {
+                alert("保存失败: " + err.message);
+            }
+        });
+
+        // 清空显存
+        document.getElementById('flush-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('flush-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/vram/flush', {method: 'POST'});
+                const data = await res.json();
+                document.getElementById('vram-status-text').innerText = `显存状态：${data.status}`;
+                document.getElementById('gen-info-box').innerText = data.message;
+                fetchMetrics();
+            } catch (err) {
+                alert("清空显存出错: " + err.message);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // 显存策略实时生效
+        document.querySelectorAll('input[name="policy"]').forEach(r => {
+            r.addEventListener('change', async () => {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({policy: r.value})
+                });
+                const statusRes = await fetch('/api/vram/status');
+                const sData = await statusRes.json();
+                document.getElementById('vram-status-text').innerText = `显存状态：${sData.status}`;
+            });
+        });
+
+        // 终端日志追加
+        // 终端日志追加 (结构化精炼步骤)
+        function appendLogs(logText) {
+            if (!logText) return;
+            const lines = logText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            for (let l of lines) {
+                l = l.trim();
+                if (!l) continue;
+                // 双重保障：过滤任何底层 GGML / CUDA / C++ 内部杂乱文本
+                if (l.startsWith('ggml_') || l.startsWith('load_backend') || l.startsWith('Device 0:') || l.includes('main.cpp') || l.includes('diffusion_engine.cpp')) {
+                    continue;
+                }
+                // 阶段进度单行动态刷新 (例如 [1/4], [2/4], [3/4], [4/4])
+                const isStage = l.startsWith('[1/4]') || l.startsWith('[2/4]') || l.startsWith('[3/4]') || l.startsWith('[4/4]');
+                if (isStage && logLines.length > 0) {
+                    const last = logLines[logLines.length - 1];
+                    if (last.slice(0, 5) === l.slice(0, 5) && !last.includes('✔')) {
+                        logLines[logLines.length - 1] = l;
+                        continue;
+                    }
+                }
+                logLines.push(l);
+            }
+            if (logLines.length > 30) logLines = logLines.slice(-30);
+            const box = document.getElementById('terminal-logs');
+            box.innerText = logLines.join('\n') + '\n';
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // 生成核心流程 (SSE 流式通信)
+        document.getElementById('generate-btn').addEventListener('click', async () => {
+            if (isGenerating) return;
+            const prompt = document.getElementById('prompt-input').value.trim();
+            if (!prompt) {
+                alert("提示词不能为空！");
+                return;
+            }
+
+            const diffM = document.getElementById('diff-select').value;
+            const teM = document.getElementById('te-select').value;
+            const vaeM = document.getElementById('vae-select').value;
+            if (!diffM || !teM || !vaeM) {
+                alert("⚠️ 当前选中的目录下缺少必要的模型文件，无法进行生成！\n请在高级设置中切换到包含有效模型的模型库预设。");
+                return;
+            }
+
+            const genBtn = document.getElementById('generate-btn');
+            const pWrapper = document.getElementById('progress-wrapper');
+            const pDesc = document.getElementById('progress-desc');
+            const pPct = document.getElementById('progress-pct');
+            const pFill = document.getElementById('progress-fill');
+            const infoBox = document.getElementById('gen-info-box');
+
+            isGenerating = true;
+            genBtn.disabled = true;
+            genBtn.innerText = "⏳ 图像生成中...";
+            pWrapper.classList.add('active');
+            pFill.style.width = '5%';
+            pPct.innerText = '5%';
+            pDesc.innerText = '正在启动任务...';
+            infoBox.innerText = '正在启动生成任务...';
+            appendLogs(">>> 任务开始...\n");
+
+            const payload = {
+                prompt: prompt,
+                width: currentW,
+                height: currentH,
+                steps: parseInt(document.getElementById('steps-input').value) || 8,
+                seed: parseInt(document.getElementById('seed-input').value) || -1,
+                policy: document.querySelector('input[name="policy"]:checked').value,
+                diff_model: document.getElementById('diff-select').value,
+                te_model: document.getElementById('te-select').value,
+                vae_model: document.getElementById('vae-select').value
+            };
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`服务响应错误 (${response.status})`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop(); // 保留最后一个未闭合块
+
+                    for (const rawEv of events) {
+                        const line = rawEv.trim();
+                        if (!line.startsWith('data:')) continue;
+                        const dataStr = line.replace(/^data:\s*/, '');
+                        if (dataStr === '[DONE]') continue;
+
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+
+                            if (data.pct !== undefined) {
+                                const pctVal = Math.round(data.pct * 100);
+                                pFill.style.width = `${pctVal}%`;
+                                pPct.innerText = `${pctVal}%`;
+                            }
+                            if (data.desc) {
+                                pDesc.innerText = data.desc;
+                                infoBox.innerText = `正在执行: ${data.desc}`;
+                            }
+                            if (data.log) {
+                                appendLogs(data.log);
+                            }
+                            if (data.image_url) {
+                                const img = document.getElementById('result-image');
+                                const placeholder = document.getElementById('placeholder-text');
+                                img.src = data.image_url + '?t=' + Date.now();
+                                img.style.display = 'block';
+                                placeholder.style.display = 'none';
+
+                                infoBox.innerHTML = `✨ <strong>生成成功</strong>！耗时: <code>${data.cost}s</code> | 分辨率: <code>${currentW}x${currentH}</code> | 模型: <code>${data.diff_model || ''}</code>`;
+                                appendLogs(`>>> 任务完成，总耗时 ${data.cost}s\n`);
+                            }
+                        } catch (pe) {
+                            console.error("JSON 解析错误:", pe, dataStr);
+                        }
+                    }
+                }
+            } catch (err) {
+                infoBox.innerHTML = `❌ <strong>生成失败</strong>: ${err.message}`;
+                appendLogs(`\n[ERROR] ${err.message}\n`);
+            } finally {
+                isGenerating = false;
+                genBtn.disabled = false;
+                genBtn.innerText = "开始生成图像 (Generate)";
+                setTimeout(() => {
+                    pWrapper.classList.remove('active');
+                }, 1200);
+                fetchMetrics();
+            }
+        });
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            fetchMetrics();
+            setInterval(fetchMetrics, 2500);
+        });
+    </script>
+</body>
+</html>

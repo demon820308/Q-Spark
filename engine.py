@@ -1,0 +1,507 @@
+import asyncio
+import base64
+import math
+import os
+import random
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import AsyncGenerator, Optional
+import json
+import httpx
+import psutil
+
+# 确保 Windows 控制台字符编码安全
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+# ==============================================================================
+# 1. 基础路径与全局配置
+# ==============================================================================
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+BIN_DIR = BASE_DIR / "bin"
+CONFIG_FILE = BASE_DIR / "config.json"
+
+
+def to_rel_or_abs(p: Path | str) -> str:
+    """如果路径在工程根目录下，返回相对路径；否则返回原始路径"""
+    try:
+        resolved = Path(p).resolve()
+        return str(resolved.relative_to(BASE_DIR))
+    except (ValueError, RuntimeError):
+        return str(p)
+
+
+def load_config() -> dict:
+    default_cfg = {
+        "models_dir": "K:\\ComfyUi\\ComfyUI\\ComfyUI\\models",
+        "models_dir_history": [
+            "K:\\ComfyUi\\ComfyUI\\ComfyUI\\models",
+            "models"
+        ],
+        "outputs_dir": "outputs",
+        "api_diff_model": "Qwen-Image-2.1-Turbo-AD-Q4_K.gguf",
+        "api_te_model": "Qwen-Image-2.1-Turbo-Abliterated-Uncensored-AD-Q4_K.gguf",
+        "api_vae_model": "qwen_image_2.1_vae_bf16.safetensors",
+        "api_steps": 8,
+    }
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                default_cfg.update(loaded)
+        except Exception:
+            pass
+    cur = default_cfg.get("models_dir", "models")
+    hist = default_cfg.get("models_dir_history", [])
+    if not isinstance(hist, list):
+        hist = [cur]
+    if cur and cur not in hist:
+        hist.insert(0, cur)
+    default_cfg["models_dir_history"] = hist
+    return default_cfg
+
+
+def save_config(cfg: dict):
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[Warning] 写入 config.json 失败: {e}")
+
+
+APP_CONFIG = load_config()
+
+_raw_models = APP_CONFIG.get("models_dir", "models")
+MODELS_DIR = Path(_raw_models) if Path(_raw_models).is_absolute() else (BASE_DIR / _raw_models).resolve()
+
+_raw_outputs = APP_CONFIG.get("outputs_dir", "outputs")
+OUTPUTS_DIR = Path(_raw_outputs) if Path(_raw_outputs).is_absolute() else (BASE_DIR / _raw_outputs).resolve()
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_api_model_status_text() -> str:
+    saved_m = APP_CONFIG.get("api_diff_model")
+    saved_s = APP_CONFIG.get("api_steps")
+    if saved_m:
+        step_str = f"{saved_s} 步" if saved_s else "自动匹配"
+        return f"📌 **当前外部 API 默认生效模型**：`{saved_m}`（{step_str}）"
+    return "📌 **当前外部 API 默认生效模型**：跟随首选模型（可点击下方按钮保存指定）"
+
+
+SD_CLI_EXE = BIN_DIR / "sd-cli.exe"
+SD_SERVER_EXE = BIN_DIR / "sd-server.exe"
+
+# Turbo 专属优化参数
+TURBO_SIGMAS = "1.0,0.978453,0.95418,0.926626,0.89508,0.845148,0.704534,0.414568,0.0"
+
+
+def get_viggle_6step_sigmas(width: int, height: int) -> str:
+    """根据图像分辨率动态计算 Viggle 6-Step 专属 Sigmas 调度表 (等同于 ComfyUI ViggleTurboSigmas 节点)"""
+    tokens = (width // 16) * (height // 16)
+    mu = 0.5 + (0.9 - 0.5) * (tokens - 256) / (8192 - 256)
+    nodes = [1.0, 0.9375, 0.875, 0.75, 0.5, 0.25]
+    sigmas = [math.exp(mu) / (math.exp(mu) + (1.0 / t - 1.0)) for t in nodes] + [0.0]
+    return ",".join(f"{s:.6f}" for s in sigmas)
+
+
+DEFAULT_STEPS = 8
+DEFAULT_CFG = 1.0
+DEFAULT_SAMPLER = "euler"
+
+
+# ==============================================================================
+# 2. 动态扫描可用模型与硬件监测指标
+# ==============================================================================
+def get_sub_dir(root: Path, names: list[str]) -> Path:
+    for name in names:
+        p = root / name
+        if p.exists() and p.is_dir():
+            return p
+    return root / names[0]
+
+
+def resolve_model_file(subfolder_names: list[str], filename: str) -> Path:
+    """在模型根目录下查找指定子目录中的具体模型文件"""
+    global MODELS_DIR
+    for folder in subfolder_names:
+        candidate = MODELS_DIR / folder / filename
+        if candidate.exists():
+            return candidate
+    return MODELS_DIR / subfolder_names[0] / filename
+
+
+def scan_models(base_path: Optional[Path | str] = None):
+    global MODELS_DIR
+    root = Path(base_path) if base_path else MODELS_DIR
+    diff_dir = get_sub_dir(root, ["diffusion_models", "diffusion"])
+    te_dir = get_sub_dir(root, ["text_encoders", "text_encoder"])
+    vae_dir = root / "vae"
+
+    valid_exts = {".gguf", ".safetensors"}
+
+    diff_models = [
+        f.name for f in diff_dir.glob("*") if f.is_file() and f.suffix.lower() in valid_exts
+    ] if diff_dir.exists() else []
+
+    te_models = [
+        f.name for f in te_dir.glob("*") if f.is_file() and f.suffix.lower() in valid_exts and not f.name.startswith("mmproj")
+    ] if te_dir.exists() else []
+
+    vae_models = [
+        f.name for f in vae_dir.glob("*") if f.is_file() and f.suffix.lower() in valid_exts
+    ] if vae_dir.exists() else []
+
+    def sort_qwen(items: list[str]) -> list[str]:
+        qwen_items = [x for x in items if "qwen" in x.lower()]
+        other_items = [x for x in items if "qwen" not in x.lower()]
+        return qwen_items + other_items
+
+    diff_models = sort_qwen(diff_models)
+    te_models = sort_qwen(te_models)
+    vae_models = sort_qwen(vae_models)
+
+    return (
+        diff_models,
+        te_models,
+        vae_models,
+    )
+
+
+def update_models_dir(new_path: Path):
+    global MODELS_DIR
+    MODELS_DIR = new_path
+
+
+def get_system_metrics() -> dict:
+    """采集 GPU 显存、物理内存与 CPU 占用率，返回结构化 dict"""
+    # 1. CPU
+    try:
+        cpu_pct = psutil.cpu_percent(interval=None)
+    except Exception:
+        cpu_pct = 0.0
+
+    # 2. RAM 内存
+    try:
+        mem = psutil.virtual_memory()
+        ram_u = mem.used / (1024**3)
+        ram_t = mem.total / (1024**3)
+        ram_pct = mem.percent
+    except Exception:
+        ram_u, ram_t, ram_pct = 0.0, 16.0, 0.0
+
+    # 3. GPU 显存 (通过 nvidia-smi 毫秒级极速采集)
+    vram_u, vram_t, vram_pct = 0.0, 10.0, 0.0
+    try:
+        out = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,nounits,noheader"],
+            text=True,
+            timeout=0.6,
+        ).strip()
+        parts = [float(x.strip()) for x in out.split(",")]
+        vram_u = parts[0] / 1024.0
+        vram_t = parts[1] / 1024.0
+        vram_pct = (vram_u / vram_t) * 100 if vram_t > 0 else 0.0
+    except Exception:
+        pass
+
+    return {
+        "vram": {"used": round(vram_u, 2), "total": round(vram_t, 1), "pct": round(vram_pct, 1)},
+        "ram": {"used": round(ram_u, 1), "total": round(ram_t, 1), "pct": round(ram_pct, 1)},
+        "cpu": {"pct": round(cpu_pct, 1)},
+    }
+
+
+# ==============================================================================
+# 3. 显存策略与推理引擎调度器 (Inference Engine)
+# ==============================================================================
+class InferenceEngine:
+    def __init__(self):
+        self.lock = asyncio.Lock()
+        self.mode = "on_demand"
+        self.idle_timeout = 300
+        self.last_active = time.time()
+        self.server_process: Optional[subprocess.Popen] = None
+        self.server_port = 40189
+        self.current_model_config = {}
+
+    def get_status_text(self):
+        is_running = self.server_process is not None and self.server_process.poll() is None
+        if self.mode == "on_demand":
+            return "即用即走（按需模式，闲置 0MB 显存）"
+        if is_running:
+            idle_left = max(0, int(self.idle_timeout - (time.time() - self.last_active)))
+            if self.mode == "auto_unload":
+                return f"常驻运行中（智能休眠，剩余 {idle_left}s 无请求释放）"
+            return "常驻运行中（显存常驻模式）"
+        return "休眠中（显存已释放，等待下次请求唤醒）"
+
+    def stop_server(self):
+        """强制终止后台常驻服务，物理级回收所有显存"""
+        if self.server_process and self.server_process.poll() is None:
+            try:
+                self.server_process.terminate()
+                self.server_process.wait(timeout=5)
+            except Exception:
+                try:
+                    self.server_process.kill()
+                except Exception:
+                    pass
+            self.server_process = None
+            return "已成功终止常驻进程，显存已清空归零。"
+        return "当前无后台常驻进程，显存处于空闲状态。"
+
+    async def _stream_sd_cli(self, cmd, cwd) -> AsyncGenerator[dict, None]:
+        """异步生成器：实时流式输出控制台日志 + 产出结构化进度事件"""
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(cwd),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+
+        error_lines = []
+        current_pct = 0.05
+        current_desc = "正在初始化推理环境..."
+        stage = 1  # 1: 文本编码, 2: DiT加载, 3: 去噪采样, 4: VAE解码
+
+        yield {"pct": current_pct, "desc": current_desc, "log": ">>> 正在启动 GPU 推理任务...\n"}
+
+        while True:
+            line_bytes = await proc.stdout.readline()
+            if not line_bytes:
+                break
+            line = line_bytes.decode("utf-8", errors="replace")
+
+            # 1. 实时写到底层控制台黑框 (保留全部底层日志便于排错)
+            sys.stdout.write(line)
+            sys.stdout.flush()
+
+            error_lines.append(line)
+            if len(error_lines) > 40:
+                error_lines.pop(0)
+
+            # 2. 状态机解析与纯净步骤日志提炼
+            web_log = ""
+            m = re.search(r'\|\s*(\d+)/(\d+)', line)
+            if m:
+                cur, tot = int(m.group(1)), int(m.group(2))
+                if stage == 1:
+                    current_pct = 0.05 + 0.25 * (cur / tot)
+                    current_desc = f"加载文本编码器模型 ({int(cur / tot * 100)}%)..."
+                    web_log = f"[1/4] 🚀 载入文本编码器与特征 ({int(cur / tot * 100)}%)...\n"
+                elif stage == 2:
+                    current_pct = 0.30 + 0.10 * (cur / tot)
+                    current_desc = f"加载 DiT 降噪主模型 ({int(cur / tot * 100)}%)..."
+                    web_log = f"[2/4] 🧩 载入 DiT 降噪主模型 ({int(cur / tot * 100)}%)...\n"
+                elif stage == 3:
+                    current_pct = 0.40 + 0.50 * (cur / tot)
+                    current_desc = f"采样去噪进行中 ({cur}/{tot} 步)..."
+                    web_log = f"[3/4] ⚡ GPU 扩散去噪采样中 ({cur}/{tot} 步)...\n"
+                elif stage == 4:
+                    current_pct = 0.90 + 0.09 * (cur / tot)
+                    current_desc = f"VAE 高清解码渲染中 ({int(cur / tot * 100)}%)..."
+                    web_log = f"[4/4] 🎨 VAE 高清解码渲染中 ({int(cur / tot * 100)}%)...\n"
+
+            if "get_learned_condition completed" in line:
+                stage = 2
+                current_pct = 0.35
+                current_desc = "提示词特征提取完成"
+                web_log = "[1/4] 🚀 提示词特征提取完成 ✔\n"
+            elif "generating image:" in line:
+                stage = 3
+                current_pct = 0.40
+                current_desc = "载入 DiT 降噪主模型完成"
+                web_log = "[2/4] 🧩 载入 DiT 降噪主模型 ✔\n"
+            elif "sampling completed" in line:
+                stage = 4
+                current_pct = 0.90
+                current_desc = "扩散去噪采样完成"
+                web_log = "[3/4] ⚡ 扩散去噪采样完成 ✔\n"
+            elif "decode_first_stage completed" in line:
+                current_pct = 0.98
+                current_desc = "VAE 高清图像解码完成"
+                web_log = "[4/4] 🎨 VAE 高清图像解码完成 ✔\n"
+            elif "generate_image completed" in line:
+                current_pct = 1.0
+                current_desc = "图像生成完成！"
+                web_log = ">>> ✨ 图像生成流程顺利完成！\n"
+
+            if web_log:
+                yield {"pct": current_pct, "desc": current_desc, "log": web_log}
+
+        ret = await proc.wait()
+        if ret != 0:
+            err_msg = "".join(error_lines[-15:])
+            raise RuntimeError(f"sd-cli 执行失败 (代码 {ret}):\n{err_msg}")
+
+    async def ensure_server(
+        self,
+        diff_model: str,
+        te_model: str,
+        vae_model: str,
+        steps: Optional[int] = None,
+        width: int = 1024,
+        height: int = 1024,
+    ):
+        target_steps = int(steps) if (steps is not None and int(steps) > 0) else (6 if "6step" in (diff_model or "").lower() else DEFAULT_STEPS)
+
+        target_config = {
+            "diff": diff_model,
+            "te": te_model,
+            "vae": vae_model,
+            "steps": target_steps,
+        }
+
+        if self.server_process and self.server_process.poll() is None:
+            if self.current_model_config == target_config:
+                return True
+            self.stop_server()
+
+        diff_path = resolve_model_file(["diffusion_models", "diffusion"], diff_model)
+        te_path = resolve_model_file(["text_encoders", "text_encoder"], te_model)
+        vae_path = resolve_model_file(["vae"], vae_model)
+
+        cmd = [
+            str(SD_SERVER_EXE),
+            "--diffusion-model", to_rel_or_abs(diff_path),
+            "--llm", to_rel_or_abs(te_path),
+            "--vae", to_rel_or_abs(vae_path),
+            "--listen-ip", "127.0.0.1",
+            "--listen-port", str(self.server_port),
+            "--steps", str(target_steps),
+            "--cfg-scale", str(DEFAULT_CFG),
+            "--sampling-method", DEFAULT_SAMPLER,
+            "-s", "-1",
+            "--diffusion-fa",
+        ]
+        if target_steps == 6:
+            cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
+        elif target_steps == 8:
+            cmd.extend(["--sigmas", TURBO_SIGMAS])
+
+        self.server_process = subprocess.Popen(cmd, cwd=str(BASE_DIR))
+        self.current_model_config = target_config
+
+        for _ in range(90):
+            await asyncio.sleep(1)
+            try:
+                async with httpx.AsyncClient(timeout=1.0) as client:
+                    resp = await client.get(f"http://127.0.0.1:{self.server_port}/v1/models")
+                    if resp.status_code == 200:
+                        return True
+            except Exception:
+                pass
+            if self.server_process.poll() is not None:
+                raise RuntimeError("sd-server 进程意外退出，请检查显存。")
+        raise TimeoutError("等待 sd-server 启动超时。")
+
+    async def generate_image_stream(
+        self,
+        prompt: str,
+        width: int = 1024,
+        height: int = 1024,
+        steps: Optional[int] = None,
+        seed: int = -1,
+        diff_model: str = "",
+        te_model: str = "",
+        vae_model: str = "",
+    ) -> AsyncGenerator[dict, None]:
+        async with self.lock:
+            self.last_active = time.time()
+            if seed == -1:
+                seed = random.randint(1, 2**31 - 1)
+
+            diff_list, te_list, vae_list = scan_models()
+            diff_model = diff_model or APP_CONFIG.get("api_diff_model") or diff_list[0]
+            te_model = te_model or APP_CONFIG.get("api_te_model") or te_list[0]
+            vae_model = vae_model or APP_CONFIG.get("api_vae_model") or vae_list[0]
+
+            if steps is None or int(steps) <= 0:
+                steps = 6 if "6step" in (diff_model or "").lower() else (APP_CONFIG.get("api_steps") or DEFAULT_STEPS)
+            steps = int(steps)
+
+            out_filename = f"img_{int(time.time())}_{seed}.png"
+            out_filepath = OUTPUTS_DIR / out_filename
+
+            diff_path = resolve_model_file(["diffusion_models", "diffusion"], diff_model)
+            te_path = resolve_model_file(["text_encoders", "text_encoder"], te_model)
+            vae_path = resolve_model_file(["vae"], vae_model)
+
+            cmd = [
+                str(SD_CLI_EXE),
+                "--diffusion-model", to_rel_or_abs(diff_path),
+                "--llm", to_rel_or_abs(te_path),
+                "--vae", to_rel_or_abs(vae_path),
+                "-p", prompt,
+                "--steps", str(steps),
+                "--cfg-scale", str(DEFAULT_CFG),
+                "--sampling-method", DEFAULT_SAMPLER,
+                "-W", str(width),
+                "-H", str(height),
+                "-s", str(seed),
+                "--diffusion-fa",
+                "--params-backend", "CUDA0",
+                "--backend", "CUDA0",
+                "-o", to_rel_or_abs(out_filepath),
+            ]
+            if steps == 6:
+                cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
+            elif steps == 8:
+                cmd.extend(["--sigmas", TURBO_SIGMAS])
+
+            # 策略 A：按需冷启动模式 (流式输出 + 实时进度)
+            if self.mode == "on_demand":
+                async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
+                    yield event
+                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model}
+                return
+
+            # 策略 B & C：常驻或自动休眠模式
+            try:
+                yield {"pct": 0.15, "desc": "准备常驻推理服务...", "log": ">>> 正在连接常驻模型服务...\n"}
+                await self.ensure_server(diff_model, te_model, vae_model, steps=steps, width=width, height=height)
+                yield {"pct": 0.45, "desc": "服务已就绪，正在进行 GPU 高速去噪...", "log": ">>> 开始发送生图任务...\n"}
+                async with httpx.AsyncClient(timeout=300.0) as client:
+                    resp = await client.post(
+                        f"http://127.0.0.1:{self.server_port}/v1/images/generations",
+                        json={
+                            "prompt": prompt,
+                            "size": f"{width}x{height}",
+                            "seed": seed,
+                            "response_format": "b64_json",
+                        },
+                    )
+                    if resp.status_code != 200:
+                        raise RuntimeError(f"sd-server 返回错误: {resp.text}")
+                    data = resp.json()
+                    b64_str = data["data"][0]["b64_json"]
+                    img_bytes = base64.b64decode(b64_str)
+                    with open(out_filepath, "wb") as f:
+                        f.write(img_bytes)
+                    yield {"pct": 1.0, "desc": "生成完成！", "log": ">>> 图像已成功保存。\n", "out_path": str(out_filepath), "diff_model": diff_model}
+                    return
+            except Exception as e:
+                print(f"\n[Warning] 常驻模式异常，正在降级回退至 sd-cli 流式执行: {e}\n")
+                self.stop_server()
+                async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
+                    yield event
+                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model}
+
+    async def idle_checker_loop(self):
+        while True:
+            await asyncio.sleep(10)
+            if self.mode == "auto_unload" and self.server_process:
+                if time.time() - self.last_active > self.idle_timeout:
+                    self.stop_server()
+
+
+engine = InferenceEngine()

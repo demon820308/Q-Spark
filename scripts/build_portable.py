@@ -87,7 +87,7 @@ def ensure_bin(bin_dir: str):
 def ensure_python_embeded(py_dir: str, root_dir: str):
     py_exe = os.path.join(py_dir, "python.exe")
     site_packages = os.path.join(py_dir, "Lib", "site-packages")
-    if os.path.exists(py_exe) and os.path.exists(os.path.join(site_packages, "gradio")):
+    if os.path.exists(py_exe) and os.path.exists(os.path.join(site_packages, "fastapi")):
         log(f"python_embeded already present: {py_dir}")
         return
 
@@ -197,11 +197,35 @@ def build_portable(version: str, output_dir: str):
     compile_launcher(root_dir, launcher_exe)
 
     # 4. Copy Core Files
-    for fn in ["app.py", "config.json", "start.bat", "app.ico", "README.md", "README_zh.md", "LICENSE"]:
+    core_files = [
+        "app.py", "engine.py", "api.py", "start.bat", "stop.bat",
+        "app.ico", "README.md", "README_zh.md", "LICENSE"
+    ]
+    for fn in core_files:
         src = os.path.join(root_dir, fn)
         if os.path.exists(src):
             shutil.copy2(src, os.path.join(build_dir, fn))
             log(f"Copied {fn}")
+
+    # Copy clean release config.json
+    default_config = {
+        "models_dir": "models",
+        "models_dir_history": ["models"],
+        "outputs_dir": "outputs",
+        "api_diff_model": "Qwen-Image-2.1-Turbo-AD-Q4_K.gguf",
+        "api_te_model": "Qwen-Image-2.1-Turbo-Abliterated-Uncensored-AD-Q4_K.gguf",
+        "api_vae_model": "qwen_image_2.1_vae_bf16.safetensors",
+        "api_steps": 8
+    }
+    with open(os.path.join(build_dir, "config.json"), "w", encoding="utf-8") as f:
+        json.dump(default_config, f, indent=2, ensure_ascii=False)
+    log("Created clean default config.json for release")
+
+    # 4.1 Copy Static Assets Directory
+    src_static = os.path.join(root_dir, "static")
+    if os.path.exists(src_static):
+        shutil.copytree(src_static, os.path.join(build_dir, "static"), dirs_exist_ok=True)
+        log("Copied static/ assets directory")
 
     # 5. Create empty directories
     for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "outputs"]:
