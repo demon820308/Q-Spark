@@ -1028,8 +1028,17 @@ summary:hover {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
+.inpaint-tools-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.inpaint-toolbar .btn-secondary,
 .tool-btn {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -1039,9 +1048,13 @@ summary:hover {
     font-size: 0.82rem;
     cursor: pointer;
     transition: all 0.15s ease;
+    white-space: nowrap !important;
+    word-break: keep-all;
+    flex-shrink: 0;
 }
 
-.tool-btn:hover {
+.tool-btn:hover,
+.inpaint-toolbar .btn-secondary:hover {
     border-color: var(--primary);
 }
 
@@ -1049,6 +1062,28 @@ summary:hover {
     background: var(--primary);
     border-color: var(--primary);
     color: #ffffff;
+}
+
+#inpaint-apply-btn {
+    width: auto !important;
+    max-width: fit-content !important;
+    background-color: var(--primary) !important;
+    border: 1px solid var(--primary) !important;
+    color: #ffffff !important;
+    padding: 5px 16px !important;
+    font-size: 0.82rem !important;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap !important;
+    word-break: keep-all;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+#inpaint-apply-btn:hover {
+    background-color: var(--primary-hover) !important;
+    border-color: var(--primary-hover) !important;
 }
 
 .inpaint-canvas-viewport {
@@ -1089,6 +1124,18 @@ summary:hover {
     touch-action: none;
 }
 
+.brush-cursor {
+    position: absolute;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    background: rgba(244, 114, 182, 0.25);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    display: none;
+    z-index: 10;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
 .mask-status-badge {
     display: inline-flex;
     align-items: center;
@@ -1102,4 +1149,113 @@ summary:hover {
     font-size: 0.76rem;
     margin-top: 6px;
 }
+
+/* 扩图 (Outpainting) 工具条样式 */
+.outpaint-panel {
+    background: #171513;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 10px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.outpaint-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.outpaint-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--primary);
+    white-space: nowrap;
+}
+
+.outpaint-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.outpaint-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.outpaint-btn:hover {
+    border-color: var(--primary);
+    background: rgba(204, 120, 92, 0.15);
+    color: #ffffff;
+}
+
+/* 多参考图 (Multi-image References) 样式 */
+.extra-ref-grid {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.extra-ref-item {
+    position: relative;
+    width: 68px;
+    height: 68px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-terminal);
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.extra-ref-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.extra-ref-badge {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.75);
+    color: #ffffff;
+    font-size: 0.65rem;
+    text-align: center;
+    padding: 1px 0;
+}
+
+.extra-ref-del {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(220, 38, 38, 0.85);
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.15s ease;
+}
+
+.extra-ref-del:hover {
+    background: #ef4444;
+}
+
 

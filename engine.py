@@ -183,6 +183,18 @@ def resolve_model_file(subfolder_names: list[str], filename: str) -> Path:
     return MODELS_DIR / subfolder_names[0] / filename
 
 
+def resolve_vision_projector(root: Optional[Path] = None) -> Optional[Path]:
+    """在文本编码器目录下定位 Qwen/Flux 视觉多模态投影器 (mmproj-*.gguf)"""
+    global MODELS_DIR
+    base = root or MODELS_DIR
+    te_dir = get_sub_dir(base, ["text_encoders", "text_encoder"])
+    if te_dir.exists():
+        for f in te_dir.glob("mmproj*"):
+            if f.is_file() and f.suffix.lower() in {".gguf", ".safetensors"}:
+                return f
+    return None
+
+
 def scan_models(base_path: Optional[Path | str] = None):
     global MODELS_DIR
     root = Path(base_path) if base_path else MODELS_DIR
@@ -542,6 +554,19 @@ class InferenceEngine:
 
         return None
 
+    def prepare_ref_images(self, ref_images_input: Optional[list]) -> list[Path]:
+        """将传入的多张参考图 (Base64 或文件名列表) 规整为磁盘上的有效图片路径"""
+        if not ref_images_input or not isinstance(ref_images_input, list):
+            return []
+        valid_paths = []
+        for img in ref_images_input:
+            if isinstance(img, dict):
+                img = img.get("dataUrl") or img.get("url") or img.get("data")
+            p = self.prepare_init_image(img)
+            if p and p.exists() and p not in valid_paths:
+                valid_paths.append(p)
+        return valid_paths
+
     async def generate_image_stream(
         self,
         prompt: str,
@@ -559,6 +584,7 @@ class InferenceEngine:
         init_image: Optional[str] = None,
         mask_image: Optional[str] = None,
         strength: Optional[float] = 0.65,
+        ref_images: Optional[list] = None,
     ) -> AsyncGenerator[dict, None]:
         async with self.lock:
             start_time = time.time()
@@ -625,6 +651,14 @@ class InferenceEngine:
                 if mask_img_path and mask_img_path.exists():
                     cmd.extend(["--mask", to_rel_or_abs(mask_img_path)])
 
+            # 视觉多模态参考图 (Multi-image References, Qwen-Image / Flux) 注入
+            ref_img_paths = self.prepare_ref_images(ref_images)
+            vision_projector = resolve_vision_projector(MODELS_DIR)
+            if ref_img_paths and vision_projector and vision_projector.exists():
+                cmd.extend(["--llm_vision", to_rel_or_abs(vision_projector), "--increase-ref-index"])
+                for rp in ref_img_paths:
+                    cmd.extend(["-r", to_rel_or_abs(rp)])
+
             if steps == 6:
                 cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
             elif steps == 8:
@@ -647,9 +681,19 @@ class InferenceEngine:
                 if items:
                     lora_log = f">>> 挂载 LoRA: {', '.join(items)}\n"
 
+            ref_log = ""
+            if ref_img_paths:
+                ref_log = f">>> 挂载视觉参考图 ({len(ref_img_paths)} 张): {', '.join(p.name for p in ref_img_paths)}\n"
+
             if init_img_path and mask_img_path:
                 task_mode = "inpaint"
                 mode_log = f">>> 任务模式: 🖌️ 局部重绘 (Inpainting) | 底图: {init_img_path.name} | 蒙版: {mask_img_path.name} | 重绘幅度: {effective_strength}\n"
+            elif init_img_path and ref_img_paths:
+                task_mode = "img2img_ref"
+                mode_log = f">>> 任务模式: 🖼️ 混合图生图 (底图 + {len(ref_img_paths)}张视觉参考图) | 重绘幅度: {effective_strength}\n"
+            elif ref_img_paths:
+                task_mode = "ref2img"
+                mode_log = f">>> 任务模式: 🖼️ 视觉参考生图 ({len(ref_img_paths)} 张参考图)\n"
             elif init_img_path:
                 task_mode = "img2img"
                 mode_log = f">>> 任务模式: 🖼️ 图生图 (img2img) | 底图: {init_img_path.name} | 重绘幅度: {effective_strength}\n"
@@ -665,6 +709,7 @@ class InferenceEngine:
                 f">>> 文本编码: {te_model}\n"
                 f">>> VAE 解码: {vae_model}\n"
                 f"{lora_log}"
+                f"{ref_log}"
             )
             yield {"pct": 0.05, "desc": "初始化任务配置...", "log": info_log}
 
@@ -694,6 +739,7 @@ class InferenceEngine:
                     "init_image": init_img_path.name if init_img_path else None,
                     "mask_image": mask_img_path.name if mask_img_path else None,
                     "strength": effective_strength if init_img_path else None,
+                    "ref_images": [p.name for p in ref_img_paths] if ref_img_paths else [],
                 }
                 try:
                     OUTPUTS_JSON_DIR.mkdir(parents=True, exist_ok=True)
@@ -703,8 +749,8 @@ class InferenceEngine:
                     print(f"[Warning] 保存历史元数据失败: {ex}")
                 return meta
 
-            # 策略 A：按需冷启动模式 (流式输出 + 实时进度) 或者是图生图任务
-            if self.mode == "on_demand" or init_img_path:
+            # 策略 A：按需冷启动模式 (流式输出 + 实时进度) 或者是图生图/参考图任务
+            if self.mode == "on_demand" or init_img_path or ref_img_paths:
                 async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
                     yield event
                 meta = _save_meta(out_filepath, diff_model)

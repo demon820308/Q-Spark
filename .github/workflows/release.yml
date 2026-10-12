@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Version tag to release (e.g. v0.1.0)'
+        description: 'Version tag to release (e.g. v0.2.2)'
         required: true
-        default: 'v0.1.0'
+        default: 'v0.2.2'
 
 permissions:
   contents: write
@@ -51,16 +51,15 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: Q-Spark ${{ steps.release_info.outputs.tag }} - Windows x64 Portable
           body: |
-            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 全能创作工作台与全功能历史画廊 2.0
+            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 多参考图联想与智能扩图升级
 
             基于 `stable-diffusion.cpp` C++ 原生引擎构建的轻量、极速本地生图工作室，内置兼容 OpenAI 的 Agent 生图接口。
 
-            ### 🚀 v0.2.1 重磅升级 (Highlights)
-            - **🎨 单一工作台三态合一**：在同一页面流畅完成文生图 (txt2img)、图生图 (img2img) 与图像编辑/局部重绘 (Inpainting)。
-            - **🖌️ 原生 Canvas 局部重绘工作台**：内置轻量无依赖涂抹工作台，画笔/橡皮擦、粗细滑块调节、一键清空与“反转蒙版”选项，导出 1:1 黑白二值 PNG 蒙版（纯黑保留，纯白重绘）。
-            - **🏷️ 多 LoRA 动态挂载机制**：支持动态扫描并同时挂载多个 LoRA，独立调节权重（0.1~2.0）。
-            - **🖼️ 沉浸式历史画廊 2.0**：伴生 Sidecar JSON 完整记录元数据，一键“⚡ 参数重绘 / 复用”、“🔄 垫图”、“🖌️ 局部重绘”，支持方案 A 全屏 1:1 / 适应屏幕大图查看器。
-            - **🧠 硬件监控与显存管理**：毫秒级显存/内存/CPU监控，支持即用即走（On-Demand 闲置 0MB）、智能休眠与常驻模式。
+            ### 🚀 ${{ steps.release_info.outputs.tag }} 重磅升级 (Highlights)
+            - **🖼️ 多参考图（Multi-image References）联想注入**：支持主底图与最多 3 张额外参考图自由组合，自动对接 Qwen-Image / Flux 多模态视觉编码。
+            - **📐 智能扩图（Outpainting）工作台**：Canvas 涂抹重绘支持等比与自由边框扩图扩展，优化 0.95 默认重绘幅度与蒙版二值映射。
+            - **🛠️ 修复多图参考提交 422 校验异常**：前后端解构提取 URL 字符串，放宽接口请求类型校验并添加详细错误捕获提示。
+            - **🎨 交互细节调优**：重构重绘工具条排版布局与光标指引，解决大图加载体验问题。
 
             ### 📦 便携版特性 (Portable Highlights)
             - **零依赖开箱即用**：内置轻量独立 Python 3.12 绿色运行时与所有依赖，无需在系统中另外安装 Python！

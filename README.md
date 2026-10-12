@@ -3,7 +3,7 @@
   <h1>Q-Spark Studio</h1>
   <p><strong>High-performance, lightweight local AI image generation studio powered by stable-diffusion.cpp with OpenAI-compatible Agent API.</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.1</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.2</a> ·
     <a href="#key-features">Key Features</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#models-catalog">Models Catalog</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=Release" alt="Latest Release" /></a>
-    <img src="https://img.shields.io/badge/Version-v0.2.1-green" alt="Version v0.2.1" />
+    <img src="https://img.shields.io/badge/Version-v0.2.2-green" alt="Version v0.2.2" />
     <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/Engine-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ Engine" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,12 +31,14 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 ---
 
-## 🌟 Key Features in v0.2.1
+## 🌟 Key Features in v0.2.2
 
 ### 1. 🎨 All-in-One Creative Workbench (Three Modes, One Studio)
 - **Text-to-Image (txt2img)**: Ultra-fast prompt-driven generation with step count, seed, and CFG scale control.
 - **Image-to-Image (img2img)**: Drag-and-drop or paste (Ctrl+V) reference images, customize Denoising Strength (0.10 ~ 1.00), and auto-match canvas aspect ratio with a single click.
-- **Inpainting & Local Editing (局部重绘)**: Built-in lightweight HTML5 Canvas painting workbench. Features brush/eraser tools, brush size slider (5px ~ 150px), mask inversion (for background replacement), and pixel-accurate 1:1 binary mask generation (`sd-cli --mask`).
+- **Inpainting & Local Editing (局部重绘)**: Built-in lightweight HTML5 Canvas painting workbench with responsive toolbar, brush/eraser tools, brush size slider (5px ~ 150px), and pixel-accurate binary mask generation (`sd-cli --mask`).
+- **Outpainting (智能扩图)**: Canvas extension supporting predefined aspect ratios and custom directional canvas expansion with automatic strength optimization.
+- **Multi-image References (多参考图)**: Flexible reference injection supporting a primary base image with up to 3 additional reference images.
 
 ### 2. 🏷️ Dynamic Multi-LoRA Mounting
 - Real-time scanning of `models/loras/`.
@@ -66,7 +68,7 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 No Python installation required. No dependencies or build tools needed.
 
-1. Download **`Q-Spark-0.2.1-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
+1. Download **`Q-Spark-0.2.2-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
 2. Extract the archive to any folder on your computer.
 3. Download your preferred models and place them into the `models/` directory (see [Models Catalog](#models-catalog) below).
 4. Double-click **`start.bat`** (or `Q-Spark.exe`).

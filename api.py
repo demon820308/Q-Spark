@@ -110,6 +110,7 @@ class OpenAIChatRequest(BaseModel):
 
 
 class UIGenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
     prompt: str
     width: Optional[int] = 1024
     height: Optional[int] = 1024
@@ -125,6 +126,7 @@ class UIGenerateRequest(BaseModel):
     init_image: Optional[str] = None
     mask_image: Optional[str] = None
     strength: Optional[float] = 0.65
+    ref_images: Optional[list] = None
 
 
 class UISaveConfigRequest(BaseModel):
@@ -307,6 +309,7 @@ async def ui_generate(req: UIGenerateRequest):
                 init_image=req.init_image,
                 mask_image=req.mask_image,
                 strength=req.strength if req.strength is not None else 0.65,
+                ref_images=req.ref_images,
             ):
                 payload = {
                     "pct": ev.get("pct", 0.0),

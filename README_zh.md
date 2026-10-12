@@ -3,7 +3,7 @@
   <h1>Q-Spark 生图控制台</h1>
   <p><strong>基于 stable-diffusion.cpp C++ 原生引擎的轻量高性能本地 AI 生图工作室，支持兼容 OpenAI 的 Agent API。</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.1</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.2</a> ·
     <a href="#核心功能特性">核心特性</a> ·
     <a href="#快速上手">快速上手</a> ·
     <a href="#模型库与目录规范">模型库指引</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=%E7%89%88%E6%9C%AC" alt="最新版本" /></a>
-    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.1-green" alt="版本 v0.2.1" />
+    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.2-green" alt="版本 v0.2.2" />
     <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/%E5%BA%95%E5%B1%82%E5%BC%95%E6%93%8E-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ 引擎" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/%E5%BC%80%E6%BA%90%E5%8D%8F%E8%AE%AE-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,12 +31,14 @@
 
 ---
 
-## 🌟 v0.2.1 核心功能特性
+## 🌟 v0.2.2 核心功能特性
 
 ### 1. 🎨 单一工作台三态合一（按需激活，参数不割裂）
 - **文生图 (txt2img)**：零底图直接输入提示词极速出图，完整支持采样步数、随机种子、CFG引导度细致调节。
 - **图生图 (img2img)**：支持点击上传、文件拖拽、剪贴板一键 Ctrl+V 粘贴底图，提供 0.10 ~ 1.00 重绘幅度（Strength）平滑控制，支持一键“📐 自动匹配底图宽高比例”。
 - **图像编辑 / 局部重绘 (Inpainting)**：内置无依赖原生 HTML5 Canvas 涂抹工作台。提供画笔/橡皮擦、5px ~ 150px 粗细实时滑块调节、一键清空、“🔄 反转蒙版（重绘背景保留主体）”选项，自动映射自然分辨率导出 1:1 黑白二值 PNG 蒙版，通过 `sd-cli --mask` 实现精准局部重绘与无缝羽化。
+- **智能扩图 (Outpainting)**：支持常用比例与上下左右自由边框扩展，自动构建带留白原图画布并智能调优重绘幅度为 0.95。
+- **多参考图联想 (Multi-image References)**：支持主底图结合最多 3 张额外视觉参考图，自动匹配 Vision Projector 视觉投射编码。
 
 ### 2. 🏷️ 多 LoRA 动态挂载管理器
 - 自动扫描识别 `models/loras/` 下的 safetensors 权重。
@@ -65,7 +67,7 @@
 
 无需安装 Python，无需配置环境或下载 pip 依赖包，解压即用！
 
-1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.1-windows-x64-portable.zip`**；
+1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.2-windows-x64-portable.zip`**；
 2. 解压到电脑上的任意文件夹；
 3. 将下载好的模型放入 `models/` 对应子目录中（详见下方 [模型库与目录规范](#模型库与目录规范)）；
 4. 双击运行 **`start.bat`**（或 `Q-Spark.exe`）；

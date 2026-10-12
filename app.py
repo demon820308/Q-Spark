@@ -16,9 +16,10 @@ class MetricsEndpointFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(MetricsEndpointFilter())
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from engine import engine, OUTPUTS_DIR, BASE_DIR
@@ -50,6 +51,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Q-Spark Studio", lifespan=lifespan)
+logger = logging.getLogger("app")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(f"Validation error on {request.method} {request.url.path}: {exc.errors()}")
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 app.add_middleware(
     CORSMiddleware,
