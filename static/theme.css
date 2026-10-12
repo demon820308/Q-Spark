@@ -68,11 +68,6 @@ body {
     gap: 12px;
 }
 
-.vram-badge {
-    font-size: 0.88rem;
-    color: var(--text-mono);
-}
-
 /* 硬件监控指标面板 (VRAM / RAM / CPU) */
 .metrics-grid {
     display: grid;
@@ -262,16 +257,44 @@ button {
 }
 
 .btn-flush {
-    border: 1px solid var(--danger);
-    color: var(--danger-text);
+    border: 1px solid #d97706;
+    color: #fbbf24;
     background: transparent;
     border-radius: 8px;
     font-size: 0.85rem;
     padding: 6px 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
 }
 
-.btn-flush:hover {
-    background-color: rgba(198, 69, 69, 0.15);
+.btn-flush:hover:not(:disabled) {
+    background-color: rgba(217, 119, 6, 0.15);
+}
+
+.btn-stop {
+    border: 1px solid #ef4444;
+    color: #f87171;
+    background: transparent;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    padding: 6px 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn-stop:hover:not(:disabled) {
+    background-color: rgba(239, 68, 68, 0.15);
+}
+
+.btn-stop:disabled, .btn-flush:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .btn-secondary {
@@ -623,6 +646,42 @@ summary:hover {
 .nav-tab.active {
     background: var(--primary);
     color: #ffffff;
+}
+
+/* 创作模式切换: 文生图 vs 图像编辑 */
+.mode-tabs-container {
+    display: flex;
+    gap: 8px;
+    background: var(--bg-subcard);
+    border: 1px solid var(--border-color);
+    padding: 4px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+}
+.mode-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.mode-tab-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.03);
+}
+.mode-tab-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* 画廊网格与卡片 */
@@ -1002,213 +1061,6 @@ summary:hover {
     display: flex;
     flex-direction: column;
     min-width: 0;
-}
-
-/* ==============================================================================
-   局部重绘 (Inpainting) 蒙版涂抹工作台样式
-   ============================================================================== */
-.inpaint-modal-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    max-width: 1080px;
-    width: 95%;
-    max-height: 92vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
-    transform: scale(0.95);
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.modal-overlay.active .inpaint-modal-card {
-    transform: scale(1);
-}
-
-.inpaint-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 20px;
-    background: var(--bg-subcard);
-    border-bottom: 1px solid var(--border-subtle);
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.inpaint-tools-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.inpaint-tools-right {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.inpaint-toolbar .btn-secondary,
-.tool-btn {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 5px 12px;
-    border-radius: 6px;
-    font-size: 0.82rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap !important;
-    word-break: keep-all;
-    flex-shrink: 0;
-}
-
-.tool-btn:hover,
-.inpaint-toolbar .btn-secondary:hover {
-    border-color: var(--primary);
-}
-
-.tool-btn.active {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: #ffffff;
-}
-
-#inpaint-apply-btn {
-    width: auto !important;
-    max-width: fit-content !important;
-    background-color: var(--primary) !important;
-    border: 1px solid var(--primary) !important;
-    color: #ffffff !important;
-    padding: 5px 16px !important;
-    font-size: 0.82rem !important;
-    font-weight: 500;
-    border-radius: 6px;
-    cursor: pointer;
-    white-space: nowrap !important;
-    word-break: keep-all;
-    flex-shrink: 0;
-    transition: all 0.15s ease;
-}
-
-#inpaint-apply-btn:hover {
-    background-color: var(--primary-hover) !important;
-    border-color: var(--primary-hover) !important;
-}
-
-.inpaint-canvas-viewport {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: auto;
-    padding: 20px;
-    background: var(--bg-terminal);
-    position: relative;
-    user-select: none;
-}
-
-.inpaint-stage-wrapper {
-    position: relative;
-    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6);
-    display: inline-block;
-    line-height: 0;
-}
-
-.inpaint-bg-img {
-    display: block;
-    max-width: 80vw;
-    max-height: 65vh;
-    object-fit: contain;
-    user-select: none;
-    pointer-events: none;
-}
-
-.inpaint-mask-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    cursor: crosshair;
-    touch-action: none;
-}
-
-.brush-cursor {
-    position: absolute;
-    border: 2px solid rgba(255, 255, 255, 0.95);
-    background: rgba(244, 114, 182, 0.25);
-    border-radius: 50%;
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-    display: none;
-    z-index: 10;
-    box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
-}
-
-.mask-status-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    background: rgba(96, 165, 250, 0.12);
-    border: 1px solid rgba(96, 165, 250, 0.35);
-    color: #60a5fa;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.76rem;
-    margin-top: 6px;
-}
-
-/* 扩图 (Outpainting) 工具条样式 */
-.outpaint-panel {
-    background: #171513;
-    border-bottom: 1px solid var(--border-subtle);
-    padding: 10px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.outpaint-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.outpaint-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--primary);
-    white-space: nowrap;
-}
-
-.outpaint-btns {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.outpaint-btn {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    padding: 4px 10px;
-    border-radius: 5px;
-    font-size: 0.76rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-}
-
-.outpaint-btn:hover {
-    border-color: var(--primary);
-    background: rgba(204, 120, 92, 0.15);
-    color: #ffffff;
 }
 
 /* 多参考图 (Multi-image References) 样式 */

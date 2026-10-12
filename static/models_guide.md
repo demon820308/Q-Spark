@@ -33,8 +33,8 @@
 
 | 组件 | 文件名 | 存放子目录 | 下载页面 |  镜像直链 |
 | :--- | :--- | :--- | :--- | :--- |
-| **降噪主模型** | `Qwen-Image-2.1-viggle-turbo-v0.3-6step-int8_convrot.safetensors` | `diffusion_models/` | [HF官方](https://huggingface.co/city96/Qwen-Image-2.1-Turbo-gguf) | [国内镜像](https://hf-mirror.com/city96/Qwen-Image-2.1-Turbo-gguf) |
-| **文本编码器** | `qwen3vl_8b_int8_convrot.safetensors` | `text_encoders/` | [HF官方](https://huggingface.co/city96/Qwen-Image-2.1-Turbo-gguf) | [国内镜像](https://hf-mirror.com/city96/Qwen-Image-2.1-Turbo-gguf) |
+| **降噪主模型** | `Qwen-Image-2.1-viggle-turbo-v0.3-6step-int8_convrot.safetensors` | `diffusion_models/` | [HF官方](https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo) | [国内镜像](https://hf-mirror.com/Viggle/Qwen-Image-2.1-viggle-turbo) |
+| **文本编码器** | `qwen3vl_8b_int8_convrot.safetensors` | `text_encoders/` | [HF官方](https://huggingface.co/Comfy-Org/Qwen-Image-2.1) | [国内镜像](https://hf-mirror.com/Comfy-Org/Qwen-Image-2.1) |
 | **变分自编码器** | `qwen_image_2.1_vae_bf16.safetensors` | `vae/` | [HF官方](https://huggingface.co/Qwen/Qwen-Image-2.1) | [国内镜像](https://hf-mirror.com/Qwen/Qwen-Image-2.1) |
 
 ---

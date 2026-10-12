@@ -198,7 +198,7 @@ def build_portable(version: str, output_dir: str):
 
     # 4. Copy Core Files
     core_files = [
-        "app.py", "engine.py", "api.py", "start.bat", "stop.bat",
+        "app.py", "engine.py", "api.py", "start.bat",
         "app.ico", "README.md", "README_zh.md", "LICENSE"
     ]
     for fn in core_files:

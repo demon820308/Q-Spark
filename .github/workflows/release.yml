@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Version tag to release (e.g. v0.2.2)'
+        description: 'Version tag to release (e.g. v0.2.1)'
         required: true
-        default: 'v0.2.2'
+        default: 'v0.2.1'
 
 permissions:
   contents: write
@@ -51,15 +51,15 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: Q-Spark ${{ steps.release_info.outputs.tag }} - Windows x64 Portable
           body: |
-            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 多参考图联想与智能扩图升级
+            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 原生视觉指令编辑与 Viggle Turbo 极速引擎
 
             基于 `stable-diffusion.cpp` C++ 原生引擎构建的轻量、极速本地生图工作室，内置兼容 OpenAI 的 Agent 生图接口。
 
             ### 🚀 ${{ steps.release_info.outputs.tag }} 重磅升级 (Highlights)
-            - **🖼️ 多参考图（Multi-image References）联想注入**：支持主底图与最多 3 张额外参考图自由组合，自动对接 Qwen-Image / Flux 多模态视觉编码。
-            - **📐 智能扩图（Outpainting）工作台**：Canvas 涂抹重绘支持等比与自由边框扩图扩展，优化 0.95 默认重绘幅度与蒙版二值映射。
-            - **🛠️ 修复多图参考提交 422 校验异常**：前后端解构提取 URL 字符串，放宽接口请求类型校验并添加详细错误捕获提示。
-            - **🎨 交互细节调优**：重构重绘工具条排版布局与光标指引，解决大图加载体验问题。
+            - **🖼️ 原生多模态图像指令编辑 (Image Edit)**：告别传统 Canvas 蒙版涂抹，采用 Qwen 原生空噪声起步与视觉投射器（Vision Projector）完整采样去噪链路，支持多参考图自然语言指令交互（自动识别并映射 `<image1>` / `<image2>`）。
+            - **⚡ 原生支持 Viggle Turbo 6-step 极速模型**：深度适配 6-step 与 8-step viggle-turbo 专属时间步 Sigmas 调度，纯 GPU 显存不溢出，极致出图效率。
+            - **🧹 极简轻量重构**：全面清理历史画板废弃 DOM、残存样式与冗余参数，前后端代码链路极简纯粹。
+            - **⏹️ 实时任务秒级中断**：支持前端一键终止与 `/api/task/stop` 接口，毫秒级终止子进程并释放 GPU 显存。
 
             ### 📦 便携版特性 (Portable Highlights)
             - **零依赖开箱即用**：内置轻量独立 Python 3.12 绿色运行时与所有依赖，无需在系统中另外安装 Python！

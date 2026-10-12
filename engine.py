@@ -162,6 +162,16 @@ DEFAULT_CFG = 1.0
 DEFAULT_SAMPLER = "euler"
 
 
+def get_model_default_steps(diff_model: str) -> int:
+    """根据模型命名特征自动判断推荐步数：6step/viggle为6步，turbo为8步，标准基模为25步"""
+    name = (diff_model or "").lower()
+    if "6step" in name or "viggle" in name:
+        return 6
+    if "turbo" in name:
+        return 8
+    return 25
+
+
 # ==============================================================================
 # 2. 动态扫描可用模型与硬件监测指标
 # ==============================================================================
@@ -293,6 +303,8 @@ class InferenceEngine:
         self.idle_timeout = 300
         self.last_active = time.time()
         self.server_process: Optional[subprocess.Popen] = None
+        self.current_cli_proc: Optional[asyncio.subprocess.Process] = None
+        self.is_task_stopped = False
         self.server_port = 40189
         self.current_model_config = {}
 
@@ -322,14 +334,39 @@ class InferenceEngine:
             return "已成功终止常驻进程，显存已清空归零。"
         return "当前无后台常驻进程，显存处于空闲状态。"
 
+    def stop_task(self):
+        """立即终止当前正在执行的生图任务"""
+        self.is_task_stopped = True
+        stopped = False
+        if self.current_cli_proc and self.current_cli_proc.returncode is None:
+            try:
+                pid = self.current_cli_proc.pid
+                if pid:
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+            except Exception:
+                pass
+            try:
+                self.current_cli_proc.kill()
+            except Exception:
+                pass
+            stopped = True
+
+        if self.server_process and self.server_process.poll() is None:
+            self.stop_server()
+            stopped = True
+
+        return "已成功终止当前生成任务。" if stopped else "当前无正在运行的生成任务。"
+
     async def _stream_sd_cli(self, cmd, cwd) -> AsyncGenerator[dict, None]:
         """异步生成器：实时流式输出控制台日志 + 产出结构化进度事件"""
+        self.is_task_stopped = False
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(cwd),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
+        self.current_cli_proc = proc
 
         error_lines = []
         current_pct = 0.05
@@ -338,73 +375,79 @@ class InferenceEngine:
 
         yield {"pct": current_pct, "desc": current_desc, "log": ">>> 正在启动 GPU 推理任务...\n"}
 
-        while True:
-            line_bytes = await proc.stdout.readline()
-            if not line_bytes:
-                break
-            line = line_bytes.decode("utf-8", errors="replace")
+        try:
+            while True:
+                line_bytes = await proc.stdout.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode("utf-8", errors="replace")
 
-            # 1. 实时写到底层控制台黑框 (保留全部底层日志便于排错)
-            sys.stdout.write(line)
-            sys.stdout.flush()
+                # 1. 实时写到底层控制台黑框 (保留全部底层日志便于排错)
+                sys.stdout.write(line)
+                sys.stdout.flush()
 
-            error_lines.append(line)
-            if len(error_lines) > 40:
-                error_lines.pop(0)
+                error_lines.append(line)
+                if len(error_lines) > 40:
+                    error_lines.pop(0)
 
-            # 2. 状态机解析与纯净步骤日志提炼
-            web_log = ""
-            m = re.search(r'\|\s*(\d+)/(\d+)', line)
-            if m:
-                cur, tot = int(m.group(1)), int(m.group(2))
-                if stage == 1:
-                    current_pct = 0.05 + 0.25 * (cur / tot)
-                    current_desc = f"加载文本编码器模型 ({int(cur / tot * 100)}%)..."
-                    web_log = f"[1/4] 🚀 载入文本编码器与特征 ({int(cur / tot * 100)}%)...\n"
-                elif stage == 2:
-                    current_pct = 0.30 + 0.10 * (cur / tot)
-                    current_desc = f"加载 DiT 降噪主模型 ({int(cur / tot * 100)}%)..."
-                    web_log = f"[2/4] 🧩 载入 DiT 降噪主模型 ({int(cur / tot * 100)}%)...\n"
-                elif stage == 3:
-                    current_pct = 0.40 + 0.50 * (cur / tot)
-                    current_desc = f"采样去噪进行中 ({cur}/{tot} 步)..."
-                    web_log = f"[3/4] ⚡ GPU 扩散去噪采样中 ({cur}/{tot} 步)...\n"
-                elif stage == 4:
-                    current_pct = 0.90 + 0.09 * (cur / tot)
-                    current_desc = f"VAE 高清解码渲染中 ({int(cur / tot * 100)}%)..."
-                    web_log = f"[4/4] 🎨 VAE 高清解码渲染中 ({int(cur / tot * 100)}%)...\n"
+                # 2. 状态机解析与纯净步骤日志提炼
+                web_log = ""
+                m = re.search(r'\|\s*(\d+)/(\d+)', line)
+                if m:
+                    cur, tot = int(m.group(1)), int(m.group(2))
+                    if stage == 1:
+                        current_pct = 0.05 + 0.25 * (cur / tot)
+                        current_desc = f"加载文本编码器模型 ({int(cur / tot * 100)}%)..."
+                        web_log = f"[1/4] 🚀 载入文本编码器与特征 ({int(cur / tot * 100)}%)...\n"
+                    elif stage == 2:
+                        current_pct = 0.30 + 0.10 * (cur / tot)
+                        current_desc = f"加载 DiT 降噪主模型 ({int(cur / tot * 100)}%)..."
+                        web_log = f"[2/4] 🧩 载入 DiT 降噪主模型 ({int(cur / tot * 100)}%)...\n"
+                    elif stage == 3:
+                        current_pct = 0.40 + 0.50 * (cur / tot)
+                        current_desc = f"采样去噪进行中 ({cur}/{tot} 步)..."
+                        web_log = f"[3/4] ⚡ GPU 扩散去噪采样中 ({cur}/{tot} 步)...\n"
+                    elif stage == 4:
+                        current_pct = 0.90 + 0.09 * (cur / tot)
+                        current_desc = f"VAE 高清解码渲染中 ({int(cur / tot * 100)}%)..."
+                        web_log = f"[4/4] 🎨 VAE 高清解码渲染中 ({int(cur / tot * 100)}%)...\n"
 
-            if "get_learned_condition completed" in line:
-                stage = 2
-                current_pct = 0.35
-                current_desc = "提示词特征提取完成"
-                web_log = "[1/4] 🚀 提示词特征提取完成 ✔\n"
-            elif "generating image:" in line:
-                stage = 3
-                current_pct = 0.40
-                current_desc = "载入 DiT 降噪主模型完成"
-                web_log = "[2/4] 🧩 载入 DiT 降噪主模型 ✔\n"
-            elif "sampling completed" in line:
-                stage = 4
-                current_pct = 0.90
-                current_desc = "扩散去噪采样完成"
-                web_log = "[3/4] ⚡ 扩散去噪采样完成 ✔\n"
-            elif "decode_first_stage completed" in line:
-                current_pct = 0.98
-                current_desc = "VAE 高清图像解码完成"
-                web_log = "[4/4] 🎨 VAE 高清图像解码完成 ✔\n"
-            elif "generate_image completed" in line:
-                current_pct = 1.0
-                current_desc = "图像生成完成！"
-                web_log = ">>> ✨ 图像生成流程顺利完成！\n"
+                if "get_learned_condition completed" in line:
+                    stage = 2
+                    current_pct = 0.35
+                    current_desc = "提示词特征提取完成"
+                    web_log = "[1/4] 🚀 提示词特征提取完成 ✔\n"
+                elif "generating image:" in line:
+                    stage = 3
+                    current_pct = 0.40
+                    current_desc = "载入 DiT 降噪主模型完成"
+                    web_log = "[2/4] 🧩 载入 DiT 降噪主模型 ✔\n"
+                elif "sampling completed" in line:
+                    stage = 4
+                    current_pct = 0.90
+                    current_desc = "扩散去噪采样完成"
+                    web_log = "[3/4] ⚡ 扩散去噪采样完成 ✔\n"
+                elif "decode_first_stage completed" in line:
+                    current_pct = 0.98
+                    current_desc = "VAE 高清图像解码完成"
+                    web_log = "[4/4] 🎨 VAE 高清图像解码完成 ✔\n"
+                elif "generate_image completed" in line:
+                    current_pct = 1.0
+                    current_desc = "图像生成完成！"
+                    web_log = ">>> ✨ 图像生成流程顺利完成！\n"
 
-            if web_log:
-                yield {"pct": current_pct, "desc": current_desc, "log": web_log}
+                if web_log:
+                    yield {"pct": current_pct, "desc": current_desc, "log": web_log}
 
-        ret = await proc.wait()
-        if ret != 0:
-            err_msg = "".join(error_lines[-15:])
-            raise RuntimeError(f"sd-cli 执行失败 (代码 {ret}):\n{err_msg}")
+            ret = await proc.wait()
+            if self.is_task_stopped:
+                yield {"pct": 0.0, "desc": "任务已手动终止", "log": ">>> ⏹️ 任务已由用户手动终止。\n"}
+                return
+            if ret != 0:
+                err_msg = "".join(error_lines[-15:])
+                raise RuntimeError(f"sd-cli 执行失败 (代码 {ret}):\n{err_msg}")
+        finally:
+            self.current_cli_proc = None
 
     async def ensure_server(
         self,
@@ -415,7 +458,7 @@ class InferenceEngine:
         width: int = 1024,
         height: int = 1024,
     ):
-        target_steps = int(steps) if (steps is not None and int(steps) > 0) else (6 if "6step" in (diff_model or "").lower() else DEFAULT_STEPS)
+        target_steps = int(steps) if (steps is not None and int(steps) > 0) else (APP_CONFIG.get("api_steps") or get_model_default_steps(diff_model))
 
         target_config = {
             "diff": diff_model,
@@ -446,9 +489,10 @@ class InferenceEngine:
             "-s", "-1",
             "--diffusion-fa",
         ]
-        if target_steps == 6:
+        is_turbo = "turbo" in diff_path.name.lower() or "6step" in diff_path.name.lower() or "viggle" in diff_path.name.lower()
+        if is_turbo and target_steps == 6:
             cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
-        elif target_steps == 8:
+        elif is_turbo and target_steps == 8 and "z_image" not in diff_path.name.lower():
             cmd.extend(["--sigmas", TURBO_SIGMAS])
 
         self.server_process = subprocess.Popen(cmd, cwd=str(BASE_DIR))
@@ -517,43 +561,6 @@ class InferenceEngine:
 
         return None
 
-    def prepare_mask_image(self, mask_image_input: Optional[str]) -> Optional[Path]:
-        """将传入的 Base64 黑白蒙版或文件路径规整为磁盘上的有效蒙版图片路径"""
-        if not mask_image_input or not isinstance(mask_image_input, str):
-            return None
-
-        INPUTS_DIR.mkdir(parents=True, exist_ok=True)
-
-        if "base64," in mask_image_input:
-            try:
-                _, b64_data = mask_image_input.split("base64,", 1)
-                raw_bytes = base64.b64decode(b64_data)
-                saved_path = INPUTS_DIR / f"mask_{int(time.time())}_{random.randint(1000, 9999)}.png"
-                saved_path.write_bytes(raw_bytes)
-                return saved_path
-            except Exception as ex:
-                print(f"[Warning] 解析 Base64 蒙版失败: {ex}")
-                return None
-
-        if len(mask_image_input) > 200 and not mask_image_input.endswith((".png", ".jpg", ".jpeg", ".webp")):
-            try:
-                raw_bytes = base64.b64decode(mask_image_input)
-                saved_path = INPUTS_DIR / f"mask_{int(time.time())}_{random.randint(1000, 9999)}.png"
-                saved_path.write_bytes(raw_bytes)
-                return saved_path
-            except Exception:
-                pass
-
-        cand = Path(mask_image_input)
-        if cand.is_file():
-            return cand
-
-        cand_in = INPUTS_DIR / mask_image_input
-        if cand_in.is_file():
-            return cand_in
-
-        return None
-
     def prepare_ref_images(self, ref_images_input: Optional[list]) -> list[Path]:
         """将传入的多张参考图 (Base64 或文件名列表) 规整为磁盘上的有效图片路径"""
         if not ref_images_input or not isinstance(ref_images_input, list):
@@ -582,9 +589,8 @@ class InferenceEngine:
         loras: Optional[list] = None,
         source: str = "web",
         init_image: Optional[str] = None,
-        mask_image: Optional[str] = None,
-        strength: Optional[float] = 0.65,
         ref_images: Optional[list] = None,
+        mode: Optional[str] = None,
     ) -> AsyncGenerator[dict, None]:
         async with self.lock:
             start_time = time.time()
@@ -598,7 +604,7 @@ class InferenceEngine:
             vae_model = vae_model or APP_CONFIG.get("api_vae_model") or vae_list[0]
 
             if steps is None or int(steps) <= 0:
-                steps = 6 if "6step" in (diff_model or "").lower() else (APP_CONFIG.get("api_steps") or DEFAULT_STEPS)
+                steps = APP_CONFIG.get("api_steps") or get_model_default_steps(diff_model)
             steps = int(steps)
             effective_cfg = float(cfg_scale) if (cfg_scale is not None and float(cfg_scale) > 0) else DEFAULT_CFG
 
@@ -610,6 +616,15 @@ class InferenceEngine:
             vae_path = resolve_model_file(["vae"], vae_model)
             lora_dir = get_sub_dir(MODELS_DIR, ["loras", "lora"])
 
+            # 模式隔离：文生图 (txt2img) vs 图像指令编辑 (edit)
+            is_txt2img_mode = (mode == "txt2img")
+            init_img_path = self.prepare_init_image(init_image) if not is_txt2img_mode else None
+
+            ref_img_paths = self.prepare_ref_images(ref_images) if not is_txt2img_mode else []
+            # 仅当没有多模态参考图列表时，才将单独底图作为参考图兜底，绝不重复插入
+            if not ref_img_paths and init_img_path:
+                ref_img_paths = [init_img_path]
+
             # 组装 Prompt 与 LoRA 宏
             final_prompt = prompt
             if loras:
@@ -619,6 +634,10 @@ class InferenceEngine:
                     stem = Path(l_name).stem
                     if l_name and f"<lora:{l_name}" not in final_prompt and f"<lora:{stem}" not in final_prompt:
                         final_prompt = f"{final_prompt} <lora:{stem}:{l_weight}>"
+
+            # 智能映射：多图编辑时将用户输入的“图1”、“图2”、“图片1”等自动映射为 Qwen 原生视觉 Token <image1>, <image2>
+            if not is_txt2img_mode and ref_img_paths and len(ref_img_paths) > 1:
+                final_prompt = re.sub(r'(?:第)?(?:图|图片)(\d+)(?:张)?(?:图)?', lambda m: f"<image{m.group(1)}>", final_prompt)
 
             cmd = [
                 str(SD_CLI_EXE),
@@ -642,26 +661,24 @@ class InferenceEngine:
             if lora_dir.exists():
                 cmd.extend(["--lora-model-dir", to_rel_or_abs(lora_dir), "--lora-apply-mode", "auto"])
 
-            # 图生图 (img2img) 与 局部重绘 (Inpainting) 注入
-            init_img_path = self.prepare_init_image(init_image)
-            mask_img_path = self.prepare_mask_image(mask_image) if init_img_path else None
-            effective_strength = max(0.05, min(1.0, float(strength or 0.65))) if init_img_path else None
-            if init_img_path and init_img_path.exists():
-                cmd.extend(["-i", to_rel_or_abs(init_img_path), "--strength", str(round(effective_strength, 2))])
-                if mask_img_path and mask_img_path.exists():
-                    cmd.extend(["--mask", to_rel_or_abs(mask_img_path)])
-
-            # 视觉多模态参考图 (Multi-image References, Qwen-Image / Flux) 注入
-            ref_img_paths = self.prepare_ref_images(ref_images)
             vision_projector = resolve_vision_projector(MODELS_DIR)
-            if ref_img_paths and vision_projector and vision_projector.exists():
-                cmd.extend(["--llm_vision", to_rel_or_abs(vision_projector), "--increase-ref-index"])
+
+            if ref_img_paths and not is_txt2img_mode:
+                task_mode = "edit"
+                if vision_projector and vision_projector.exists():
+                    cmd.extend(["--llm_vision", to_rel_or_abs(vision_projector)])
+                cmd.append("--increase-ref-index")
                 for rp in ref_img_paths:
                     cmd.extend(["-r", to_rel_or_abs(rp)])
+                mode_log = f">>> 任务模式: 🖼️ 图像指令编辑 (Image Edit) | 视觉参考图: {len(ref_img_paths)} 张 (纯空噪声起步，完整采样去噪)\n"
+            else:
+                task_mode = "txt2img"
+                mode_log = ">>> 任务模式: 🎨 文生图 (txt2img)\n"
 
-            if steps == 6:
+            is_turbo = "turbo" in diff_path.name.lower() or "6step" in diff_path.name.lower() or "viggle" in diff_path.name.lower()
+            if is_turbo and steps == 6:
                 cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
-            elif steps == 8:
+            elif is_turbo and steps == 8 and "z_image" not in diff_path.name.lower():
                 cmd.extend(["--sigmas", TURBO_SIGMAS])
 
             policy_map = {
@@ -682,24 +699,8 @@ class InferenceEngine:
                     lora_log = f">>> 挂载 LoRA: {', '.join(items)}\n"
 
             ref_log = ""
-            if ref_img_paths:
-                ref_log = f">>> 挂载视觉参考图 ({len(ref_img_paths)} 张): {', '.join(p.name for p in ref_img_paths)}\n"
-
-            if init_img_path and mask_img_path:
-                task_mode = "inpaint"
-                mode_log = f">>> 任务模式: 🖌️ 局部重绘 (Inpainting) | 底图: {init_img_path.name} | 蒙版: {mask_img_path.name} | 重绘幅度: {effective_strength}\n"
-            elif init_img_path and ref_img_paths:
-                task_mode = "img2img_ref"
-                mode_log = f">>> 任务模式: 🖼️ 混合图生图 (底图 + {len(ref_img_paths)}张视觉参考图) | 重绘幅度: {effective_strength}\n"
-            elif ref_img_paths:
-                task_mode = "ref2img"
-                mode_log = f">>> 任务模式: 🖼️ 视觉参考生图 ({len(ref_img_paths)} 张参考图)\n"
-            elif init_img_path:
-                task_mode = "img2img"
-                mode_log = f">>> 任务模式: 🖼️ 图生图 (img2img) | 底图: {init_img_path.name} | 重绘幅度: {effective_strength}\n"
-            else:
-                task_mode = "txt2img"
-                mode_log = ">>> 任务模式: 🎨 文生图 (txt2img)\n"
+            if ref_img_paths and not is_txt2img_mode:
+                ref_log = f">>> 挂载视觉参考图 ({len(ref_img_paths)} 张): {', '.join(f'<image{i+1}>: {p.name}' for i, p in enumerate(ref_img_paths))}\n"
 
             info_log = (
                 f"{mode_log}"
@@ -737,8 +738,6 @@ class InferenceEngine:
                     "created_at": int(time.time()),
                     "created_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                     "init_image": init_img_path.name if init_img_path else None,
-                    "mask_image": mask_img_path.name if mask_img_path else None,
-                    "strength": effective_strength if init_img_path else None,
                     "ref_images": [p.name for p in ref_img_paths] if ref_img_paths else [],
                 }
                 try:
@@ -753,6 +752,8 @@ class InferenceEngine:
             if self.mode == "on_demand" or init_img_path or ref_img_paths:
                 async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
                     yield event
+                if self.is_task_stopped:
+                    return
                 meta = _save_meta(out_filepath, diff_model)
                 yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
                 return
@@ -787,6 +788,8 @@ class InferenceEngine:
                 self.stop_server()
                 async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
                     yield event
+                if self.is_task_stopped:
+                    return
                 meta = _save_meta(out_filepath, diff_model)
                 yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
 

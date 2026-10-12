@@ -124,9 +124,8 @@ class UIGenerateRequest(BaseModel):
     cfg_scale: Optional[float] = 1.0
     loras: Optional[list] = None
     init_image: Optional[str] = None
-    mask_image: Optional[str] = None
-    strength: Optional[float] = 0.65
     ref_images: Optional[list] = None
+    mode: Optional[str] = "txt2img"
 
 
 class UISaveConfigRequest(BaseModel):
@@ -157,6 +156,12 @@ async def get_vram_status():
 async def flush_vram_api():
     msg = engine.stop_server()
     return {"message": msg, "status": engine.get_status_text()}
+
+
+@router.post("/api/task/stop")
+async def stop_task_api():
+    msg = engine.stop_task()
+    return {"message": msg, "stopped": True}
 
 
 @router.get("/api/metrics")
@@ -307,9 +312,8 @@ async def ui_generate(req: UIGenerateRequest):
                 loras=req.loras or [],
                 source="web",
                 init_image=req.init_image,
-                mask_image=req.mask_image,
-                strength=req.strength if req.strength is not None else 0.65,
                 ref_images=req.ref_images,
+                mode=req.mode,
             ):
                 payload = {
                     "pct": ev.get("pct", 0.0),
