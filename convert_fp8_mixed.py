@@ -6,7 +6,7 @@ from safetensors.torch import save_file
 import comfy_kitchen as ck
 
 SRC_PATH = r"K:\ComfyUi\ComfyUI\ComfyUI\models\text_encoders\qwen_3_4b_fp8_mixed.safetensors"
-DST_PATH = r"K:\ComfyUi\ComfyUI\ComfyUI\models\text_encoders\qwen_3_4b_fixed.safetensors"
+DST_PATH = r"K:\ComfyUi\ComfyUI\ComfyUI\models\text_encoders\qwen_3_4b_fp8_mixed_fixed.safetensors"
 
 def main():
     print(f"正在读取源文件: {SRC_PATH}")

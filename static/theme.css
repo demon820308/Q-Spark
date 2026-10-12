@@ -489,6 +489,14 @@ summary:hover {
 .markdown-doc th {
     background-color: #211e1a;
     color: var(--text-title);
+    white-space: nowrap;
+}
+
+.markdown-doc td:first-child,
+.markdown-doc td:nth-child(3),
+.markdown-doc td:nth-child(4),
+.markdown-doc td:nth-child(5) {
+    white-space: nowrap;
 }
 
 .markdown-doc a {
@@ -695,15 +703,20 @@ summary:hover {
 }
 .gallery-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    align-items: center;
     margin-top: auto;
     border-top: 1px solid var(--border-subtle);
     padding-top: 10px;
 }
 .gallery-actions button {
     flex: 1;
-    font-size: 0.80rem;
-    padding: 6px 8px;
+    font-size: 0.78rem;
+    padding: 6px 2px;
+    white-space: nowrap;
+    word-break: keep-all;
+    text-align: center;
+    min-width: 0;
 }
 
 /* LoRA 标签 */

@@ -227,6 +227,12 @@ def build_portable(version: str, output_dir: str):
         shutil.copytree(src_static, os.path.join(build_dir, "static"), dirs_exist_ok=True)
         log("Copied static/ assets directory")
 
+    # 4.2 Copy Fix-convert Directory
+    src_fix = os.path.join(root_dir, "Fix-convert")
+    if os.path.exists(src_fix):
+        shutil.copytree(src_fix, os.path.join(build_dir, "Fix-convert"), dirs_exist_ok=True)
+        log("Copied Fix-convert/ directory")
+
     # 5. Create empty directories
     for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "models/loras", "outputs", "outputs/json", "inputs"]:
         d = os.path.join(build_dir, sub)

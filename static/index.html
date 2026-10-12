@@ -15,9 +15,14 @@
             <div class="dark-title">Q-Spark Studio</div>
             <div class="dark-subtitle">生图控制台 · stable-diffusion.cpp 引擎 · 支持 Agent API</div>
         </div>
-        <div class="header-nav-tabs">
-            <button class="nav-tab active" id="tab-create-btn">🎨 图像创作 (Create)</button>
-            <button class="nav-tab" id="tab-gallery-btn">🖼️ 历史画廊 (Gallery)</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="nav-tab" id="open-doc-btn" style="background: var(--bg-subcard); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 10px; color: var(--text-title); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="查看模型下载说明文档与配置指南">
+                📖 模型下载说明文档
+            </button>
+            <div class="header-nav-tabs">
+                <button class="nav-tab active" id="tab-create-btn">🎨 图像创作 (Create)</button>
+                <button class="nav-tab" id="tab-gallery-btn">🖼️ 历史画廊 (Gallery)</button>
+            </div>
         </div>
         <div class="header-actions">
             <span class="vram-badge" id="vram-status-text">显存状态：检测中...</span>
@@ -68,7 +73,7 @@
                     <label for="prompt-input" style="margin: 0;">提示词 (Prompt)</label>
                     <button type="button" class="btn-coral" id="generate-btn-top" style="width: auto; padding: 4px 14px; font-size: 0.82rem; border-radius: 6px;">▶ 开始生成</button>
                 </div>
-                <textarea id="prompt-input" rows="5" placeholder="输入希望生成的画面描述（支持中英文，已去除所有审查限制）..."></textarea>
+                <textarea id="prompt-input" rows="5" placeholder="输入希望生成的画面描述（支持中英文）"></textarea>
             </div>
 
             <!-- 图生图 / 多模态参考图卡片 -->
@@ -163,15 +168,6 @@
                             <button class="btn-secondary" id="add-dir-btn">➕ 添加新预设</button>
                         </div>
                     </div>
-
-                    <!-- 模型下载说明文档 (懒加载) -->
-                    <details id="doc-details">
-                        <summary>📖 模型下载说明文档</summary>
-                        <div class="details-body markdown-doc" id="doc-content">
-                            <em>加载中...</em>
-                        </div>
-                    </details>
-
                     <div class="form-group">
                         <label for="diff-select">降噪主模型 (diffusion_models)</label>
                         <select id="diff-select"></select>
@@ -223,9 +219,9 @@
                 </div>
             </details>
  
-            <!-- 高级参数设置（传统模型 / CFG / 负面词 / LoRA） -->
+            <!-- 高级参数设置（传统模型 / CFG / 负面提示词 / LoRA） -->
             <details class="model-select-group" style="margin-bottom: 16px;" id="advanced-params-drawer">
-                <summary style="font-size: 0.88rem; font-weight: 500; cursor: pointer; color: var(--text-muted); padding: 4px 0;">⚙️ 高级控制与传统模型扩展（负面词 / CFG / LoRA）</summary>
+                <summary style="font-size: 0.88rem; font-weight: 500; cursor: pointer; color: var(--text-muted); padding: 4px 0;">⚙️ 高级控制与传统模型扩展（负面提示词 / CFG / LoRA）</summary>
                 <div style="margin-top: 12px;">
                     <div class="form-group">
                         <label for="negative-prompt-input">负面提示词 (Negative Prompt)</label>
@@ -378,12 +374,16 @@
                         <strong style="font-size: 0.85rem;">挂载 LoRA：</strong>
                         <div id="modal-loras" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
                     </div>
-                    <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
-                        <button class="btn-coral" id="modal-reuse-btn" style="flex: 1;">⚡ 参数重绘</button>
-                        <button class="btn-secondary" id="modal-img2img-btn" style="flex: 1;">🔄 图生图</button>
-                        <button class="btn-secondary" id="modal-inpaint-btn" style="flex: 1; border-color: rgba(236,72,153,0.4); color: #f472b6;">🖌️ 局部重绘</button>
-                        <button class="btn-secondary" id="modal-copy-btn" style="flex: 0.8;">📋 复制提示词</button>
-                        <a id="modal-dl-btn" href="" download class="btn-secondary" style="text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0 10px;">⬇️ 下载</a>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-coral" id="modal-reuse-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">参数重绘</button>
+                            <button class="btn-secondary" id="modal-img2img-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">图生图</button>
+                            <button class="btn-secondary" id="modal-inpaint-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem; border-color: rgba(236,72,153,0.4); color: #f472b6;">局部重绘</button>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-secondary" id="modal-copy-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">复制提示词</button>
+                            <a id="modal-dl-btn" href="" download class="btn-secondary" style="flex: 1; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">下载</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -485,6 +485,21 @@
             <div class="modal-actions">
                 <button id="modal-cancel-btn" class="btn-secondary" style="display: none; padding: 8px 20px;">取消</button>
                 <button id="modal-ok-btn" class="btn-primary" style="padding: 8px 24px;">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模型下载说明文档弹窗 -->
+    <div id="doc-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 880px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid var(--border-color);">
+                <div style="font-size: 1.15rem; font-weight: 600; color: var(--text-title); display: flex; align-items: center; gap: 8px;">
+                    📖 模型下载说明文档与配置指南
+                </div>
+                <button id="doc-modal-close-btn" class="btn-secondary" style="padding: 4px 10px; font-size: 0.9rem;">✕ 关闭</button>
+            </div>
+            <div class="markdown-doc" id="doc-content" style="padding: 20px 26px; overflow-y: auto; flex: 1; font-size: 0.92rem; line-height: 1.65;">
+                <em>加载中...</em>
             </div>
         </div>
     </div>
@@ -721,9 +736,12 @@
             });
         });
 
-        // 懒加载说明文档
-        document.getElementById('doc-details').addEventListener('toggle', async (e) => {
-            if (e.target.open && !docLoaded) {
+        // 模型下载说明文档弹窗
+        async function openDocModal() {
+            const modal = document.getElementById('doc-modal');
+            if (!modal) return;
+            modal.classList.add('active');
+            if (!docLoaded) {
                 try {
                     const res = await fetch('/api/docs/models');
                     const data = await res.json();
@@ -733,6 +751,17 @@
                     document.getElementById('doc-content').innerText = "加载说明文档失败。";
                 }
             }
+        }
+
+        function closeDocModal() {
+            const modal = document.getElementById('doc-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        document.getElementById('open-doc-btn')?.addEventListener('click', openDocModal);
+        document.getElementById('doc-modal-close-btn')?.addEventListener('click', closeDocModal);
+        document.getElementById('doc-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'doc-modal') closeDocModal();
         });
 
         // 切换并重新扫描选中的预设目录
@@ -1241,11 +1270,11 @@
                             <div class="gallery-prompt" onclick="openGalleryDetail(${idx})" title="${safePrompt}">${safePrompt}</div>
                             <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">📅 ${timeStr}</div>
                             <div class="gallery-actions">
-                                <button class="btn-coral" onclick="reuseGalleryItem(${idx})">⚡ 复用</button>
-                                <button class="btn-secondary" onclick="sendToImg2Img(${idx})" title="以此图作为底图进行图生图">🔄 垫图</button>
-                                <button class="btn-secondary" onclick="sendToInpaint(${idx})" title="涂抹该图进行局部重绘" style="color: #f472b6;">🖌️ 重绘</button>
-                                <button class="btn-secondary" onclick="copyPromptText('${encodeURIComponent(item.prompt || '')}')">📋 复制</button>
-                                <button class="btn-flush" onclick="deleteGalleryItem('${item.filename}')" style="color: var(--danger-text);">🗑️</button>
+                                <button class="btn-coral" onclick="reuseGalleryItem(${idx})">复用</button>
+                                <button class="btn-secondary" onclick="sendToImg2Img(${idx})" title="以此图作为底图进行图生图">垫图</button>
+                                <button class="btn-secondary" onclick="sendToInpaint(${idx})" title="涂抹该图进行局部重绘" style="color: #f472b6;">重绘</button>
+                                <button class="btn-secondary" onclick="copyPromptText('${encodeURIComponent(item.prompt || '')}')">复制</button>
+                                <button class="btn-flush" onclick="deleteGalleryItem('${item.filename}')" style="color: var(--danger-text);" title="删除图片">删除</button>
                             </div>
                         </div>
                     </div>
@@ -1379,6 +1408,11 @@
                 const inpaintModal = document.getElementById('inpaint-modal');
                 if (inpaintModal && inpaintModal.classList.contains('active')) {
                     closeInpaintModal();
+                    return;
+                }
+                const docModal = document.getElementById('doc-modal');
+                if (docModal && docModal.classList.contains('active')) {
+                    closeDocModal();
                     return;
                 }
                 const modal = document.getElementById('gallery-modal');

@@ -118,7 +118,16 @@ models/
 | **文本编码器** | `Qwen-Image-2.1-Turbo-Abliterated-Uncensored-AD-Q4_K.gguf` | `models/text_encoders/` | [HF官方](https://huggingface.co/AtomicChat/Qwen-Image-2.1-Turbo-Uncensored-GGUF) \| [国内镜像](https://hf-mirror.com/AtomicChat/Qwen-Image-2.1-Turbo-Uncensored-GGUF) |
 | **变分自编码器** | `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` | [HF官方](https://huggingface.co/Qwen/Qwen-Image-2.1) \| [国内镜像](https://hf-mirror.com/Qwen/Qwen-Image-2.1) |
 
-#### 🚀 套装二：Qwen-Image-2.1-Turbo 6步动态加速版（INT8 Safetensors）
+#### 🔥 套装二：Qwen-Image-2.1-UC 免审核 INT8 完整量化套装（abenzerps 推荐）
+*纯 Safetensors 原生量化格式，免审核（Uncensored）降噪核心，搭配 INT8 文本编码器与 BF16 VAE，画质与生成表现极其出色。*
+
+| 组件 | 推荐文件名 | 放置子目录 | 下载渠道 |
+| :--- | :--- | :--- | :--- |
+| **降噪主模型** | `qwen-image-2.1-UC-int8_convrot.safetensors` | `models/diffusion_models/` | [HF官方](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized/tree/main) \| [国内镜像](https://hf-mirror.com/abenzerps/Qwen-Image-2.1-Uncensored-Quantized) |
+| **文本编码器** | `qwen3vl_8b_int8_convrot.safetensors` | `models/text_encoders/` | [HF官方](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized/tree/main) \| [国内镜像](https://hf-mirror.com/abenzerps/Qwen-Image-2.1-Uncensored-Quantized) |
+| **变分自编码器** | `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` | [HF官方](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized/tree/main) \| [国内镜像](https://hf-mirror.com/abenzerps/Qwen-Image-2.1-Uncensored-Quantized) |
+
+#### 🚀 套装三：Qwen-Image-2.1-Turbo 6步动态加速版（INT8 Safetensors）
 *搭配 Viggle 分辨率动态调度算法，只需 6 步即可生成细腻大图。*
 
 | 组件 | 推荐文件名 | 放置子目录 | 下载渠道 |
@@ -127,14 +136,25 @@ models/
 | **文本编码器** | `qwen3vl_8b_int8_convrot.safetensors` | `models/text_encoders/` | [HF官方](https://huggingface.co/city96/Qwen-Image-2.1-Turbo-gguf) \| [国内镜像](https://hf-mirror.com/city96/Qwen-Image-2.1-Turbo-gguf) |
 | **变分自编码器** | `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` | 同套装一 |
 
-#### 🎨 套装三：Z-Image Turbo 体系（阿里单流 S3-DiT 架构）
+#### 🎨 套装四：Z-Image Turbo 体系（阿里单流 S3-DiT 架构）
 *阿里通义开源轻量新架构，推荐步数 8~9 步，采样器 `euler`。*
 
 | 组件 | 推荐文件名 | 放置子目录 | 下载渠道 |
 | :--- | :--- | :--- | :--- |
 | **降噪主模型** | `z_image_turbo_int8_convrot.safetensors` | `models/diffusion_models/` | [HF官方](https://huggingface.co/Comfy-Org/z_image_turbo) \| [国内镜像](https://hf-mirror.com/Comfy-Org/z_image_turbo) |
-| **文本编码器** | `qwen_3_4b_fixed.safetensors` 或 `qwen_3_4b.safetensors` | `models/text_encoders/` | [HF官方原版](https://huggingface.co/Comfy-Org/z_image_turbo) *(注：请勿使用带 NVFP4 2D分块量化的实验版)* |
-| **变分自编码器** | `ae.safetensors` (Flux VAE) | `models/vae/` | [HF官方](https://huggingface.co/Comfy-Org/z_image_turbo) |
+| **文本编码器** | `qwen_3_4b_fp8_mixed_fixed.safetensors` (修复版) 或 `qwen_3_4b.safetensors` | `models/text_encoders/` | [HF官方原版](https://huggingface.co/Comfy-Org/z_image_turbo) \| [国内镜像](https://hf-mirror.com/Comfy-Org/z_image_turbo) |
+| **变分自编码器** | `ae.safetensors` (Flux VAE) | `models/vae/` | [HF官方](https://huggingface.co/Comfy-Org/z_image_turbo) \| [国内镜像](https://hf-mirror.com/Comfy-Org/z_image_turbo) |
+
+> 🛠️ **Z-Image 文本编码器修复指南（Fix-convert 说明）**
+> - **为什么要用 Fix-convert？**  
+>   社区和 Comfy-Org 早期分发的 `qwen_3_4b_fp8_mixed.safetensors` 中，包含 12 个带有非标 **NVFP4 2D 分块量化**的注意力层（含有 `.comfy_quant` 与 `weight_scale_2`）。底层的纯 C++ 推理引擎（`stable-diffusion.cpp`）不支持这种非标 NVFP4 格式，直接载入会报错或生图黑屏。  
+>   通过项目内置的 `Fix-convert` 工具，在 GPU 上将这 12 个非标层反量化还原为标准 `bfloat16`（其余标准 FP8 层原样保留），即可生成能被完全兼容解析的标准模型 `qwen_3_4b_fp8_mixed_fixed.safetensors`。
+> - **使用方法：**
+>   1. 将待修复的 `qwen_3_4b_fp8_mixed.safetensors` 放入项目中的 `Fix-convert/` 文件夹中（或直接拖拽到 `一键修复.bat` 上）；
+>   2. 双击运行 `Fix-convert/一键修复.bat`；
+>   3. 稍候片刻，同目录下会自动生成修复后的 `qwen_3_4b_fp8_mixed_fixed.safetensors`；
+>   4. 将生成的文件放入 `models/text_encoders/` 目录中即可直接在控制台调用。
+
 
 ---
 

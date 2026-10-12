@@ -299,7 +299,7 @@ class InferenceEngine:
     def get_status_text(self):
         is_running = self.server_process is not None and self.server_process.poll() is None
         if self.mode == "on_demand":
-            return "即用即走（按需模式，闲置 0MB 显存）"
+            return "即用即走"
         if is_running:
             idle_left = max(0, int(self.idle_timeout - (time.time() - self.last_active)))
             if self.mode == "auto_unload":

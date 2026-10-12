@@ -119,7 +119,16 @@ models/
 | **Text Encoder** | `Qwen-Image-2.1-Turbo-Abliterated-Uncensored-AD-Q4_K.gguf` | `models/text_encoders/` | [HuggingFace](https://huggingface.co/AtomicChat/Qwen-Image-2.1-Turbo-Uncensored-GGUF) \| [Mirror (CN)](https://hf-mirror.com/AtomicChat/Qwen-Image-2.1-Turbo-Uncensored-GGUF) |
 | **VAE** | `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` | [HuggingFace](https://huggingface.co/Qwen/Qwen-Image-2.1) \| [Mirror (CN)](https://hf-mirror.com/Qwen/Qwen-Image-2.1) |
 
-#### 🚀 Preset 2: Qwen-Image-2.1-Turbo 6-Step Dynamic (INT8 Safetensors)
+#### 🔥 Preset 2: Qwen-Image-2.1-UC Uncensored INT8 (abenzerps Recommended)
+*Pure native Safetensors format, uncensored DiT backbone with INT8 text encoder and BF16 VAE.*
+
+| Component | File Name | Destination | Download Links |
+| :--- | :--- | :--- | :--- |
+| **Diffusion Model** | `qwen-image-2.1-UC-int8_convrot.safetensors` | `models/diffusion_models/` | [HuggingFace](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized/tree/main) \| [Mirror (CN)](https://hf-mirror.com/abenzerps/Qwen-Image-2.1-Uncensored-Quantized) |
+| **Text Encoder** | `qwen3vl_8b_int8_convrot.safetensors` | `models/text_encoders/` | [HuggingFace](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized/tree/main) \| [Mirror (CN)](https://hf-mirror.com/abenzerps/Qwen-Image-2.1-Uncensored-Quantized) |
+| **VAE** | `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` | [HuggingFace](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized/tree/main) \| [Mirror (CN)](https://hf-mirror.com/abenzerps/Qwen-Image-2.1-Uncensored-Quantized) |
+
+#### 🚀 Preset 3: Qwen-Image-2.1-Turbo 6-Step Dynamic (INT8 Safetensors)
 *Powered by dynamic Viggle resolution-shifted schedule.*
 
 | Component | File Name | Destination | Download Links |
@@ -128,14 +137,25 @@ models/
 | **Text Encoder** | `qwen3vl_8b_int8_convrot.safetensors` | `models/text_encoders/` | [HuggingFace](https://huggingface.co/city96/Qwen-Image-2.1-Turbo-gguf) \| [Mirror (CN)](https://hf-mirror.com/city96/Qwen-Image-2.1-Turbo-gguf) |
 | **VAE** | `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` | Same as Preset 1 |
 
-#### 🎨 Preset 3: Z-Image Turbo Architecture (Single-Stream S3-DiT)
+#### 🎨 Preset 4: Z-Image Turbo Architecture (Single-Stream S3-DiT)
 *Alibaba Tongyi-MAI's architecture, 8~9 steps Euler generation.*
 
 | Component | File Name | Destination | Download Links |
 | :--- | :--- | :--- | :--- |
 | **Diffusion Model** | `z_image_turbo_int8_convrot.safetensors` | `models/diffusion_models/` | [HuggingFace](https://huggingface.co/Comfy-Org/z_image_turbo) \| [Mirror (CN)](https://hf-mirror.com/Comfy-Org/z_image_turbo) |
-| **Text Encoder** | `qwen_3_4b_fixed.safetensors` or `qwen_3_4b.safetensors` | `models/text_encoders/` | [HuggingFace](https://huggingface.co/Comfy-Org/z_image_turbo) *(Note: avoid experimental NVFP4 block-quantized versions)* |
-| **VAE** | `ae.safetensors` (Flux VAE) | `models/vae/` | [HuggingFace](https://huggingface.co/Comfy-Org/z_image_turbo) |
+| **Text Encoder** | `qwen_3_4b_fp8_mixed_fixed.safetensors` (Fixed) or `qwen_3_4b.safetensors` | `models/text_encoders/` | [HuggingFace](https://huggingface.co/Comfy-Org/z_image_turbo) \| [Mirror (CN)](https://hf-mirror.com/Comfy-Org/z_image_turbo) |
+| **VAE** | `ae.safetensors` (Flux VAE) | `models/vae/` | [HuggingFace](https://huggingface.co/Comfy-Org/z_image_turbo) \| [Mirror (CN)](https://hf-mirror.com/Comfy-Org/z_image_turbo) |
+
+> 🛠️ **Z-Image Text Encoder Fix Guide (Fix-convert)**
+> - **Why Fix-convert?**  
+>   Standard community distributions of `qwen_3_4b_fp8_mixed.safetensors` contain 12 non-standard **NVFP4 2D block-quantized layers** (`.comfy_quant` and `weight_scale_2`). Native C++ engines (`stable-diffusion.cpp`) do not support these non-standard NVFP4 operators and will crash or output black images.  
+>   The included `Fix-convert` utility uses GPU kernels to dequantize these 12 layers back to standard `bfloat16` while preserving standard FP8 layers, yielding the fully compatible `qwen_3_4b_fp8_mixed_fixed.safetensors`.
+> - **How to use:**
+>   1. Place `qwen_3_4b_fp8_mixed.safetensors` inside `Fix-convert/` (or drag and drop onto `一键修复.bat`);
+>   2. Double-click `Fix-convert/一键修复.bat`;
+>   3. The script outputs `qwen_3_4b_fp8_mixed_fixed.safetensors` in the same folder;
+>   4. Copy the fixed file to `models/text_encoders/`.
+
 
 ---
 
