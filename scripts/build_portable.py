@@ -228,7 +228,7 @@ def build_portable(version: str, output_dir: str):
         log("Copied static/ assets directory")
 
     # 5. Create empty directories
-    for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "outputs"]:
+    for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "models/loras", "outputs", "outputs/json", "inputs"]:
         d = os.path.join(build_dir, sub)
         os.makedirs(d, exist_ok=True)
         # Place empty marker

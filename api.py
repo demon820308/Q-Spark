@@ -15,6 +15,7 @@ from engine import (
     APP_CONFIG,
     MODELS_DIR,
     OUTPUTS_DIR,
+    OUTPUTS_JSON_DIR,
     BASE_DIR,
     DEFAULT_STEPS,
     save_config,
@@ -118,6 +119,12 @@ class UIGenerateRequest(BaseModel):
     diff_model: Optional[str] = None
     te_model: Optional[str] = None
     vae_model: Optional[str] = None
+    negative_prompt: Optional[str] = ""
+    cfg_scale: Optional[float] = 1.0
+    loras: Optional[list] = None
+    init_image: Optional[str] = None
+    mask_image: Optional[str] = None
+    strength: Optional[float] = 0.65
 
 
 class UISaveConfigRequest(BaseModel):
@@ -160,7 +167,7 @@ async def get_metrics_api():
 # ==============================================================================
 @router.get("/api/config")
 async def get_ui_config():
-    diff_choices, te_choices, vae_choices = scan_models()
+    diff_choices, te_choices, vae_choices, lora_choices = scan_models()
     return {
         "config": APP_CONFIG,
         "models_dir": to_rel_or_abs(MODELS_DIR),
@@ -168,6 +175,7 @@ async def get_ui_config():
         "diff_choices": diff_choices,
         "te_choices": te_choices,
         "vae_choices": vae_choices,
+        "lora_choices": lora_choices,
         "status_text": engine.get_status_text(),
         "api_status_text": get_api_model_status_text(),
         "engine_mode": engine.mode,
@@ -217,7 +225,7 @@ async def scan_models_api(req: UIScanModelsRequest):
         hist.insert(0, rel_p)
     save_config(APP_CONFIG)
 
-    diff_choices, te_choices, vae_choices = scan_models(p)
+    diff_choices, te_choices, vae_choices, lora_choices = scan_models(p)
     return {
         "success": True,
         "models_dir": rel_p,
@@ -225,7 +233,8 @@ async def scan_models_api(req: UIScanModelsRequest):
         "diff_choices": diff_choices,
         "te_choices": te_choices,
         "vae_choices": vae_choices,
-        "message": f"模型目录已更新并扫描：主模型 {len(diff_choices)} 个 | 文本编码器 {len(te_choices)} 个 | VAE {len(vae_choices)} 个",
+        "lora_choices": lora_choices,
+        "message": f"模型目录已更新并扫描：主模型 {len(diff_choices)} 个 | 文本编码器 {len(te_choices)} 个 | VAE {len(vae_choices)} 个 | LoRA {len(lora_choices)} 个",
     }
 
 
@@ -247,7 +256,7 @@ async def delete_preset_api(req: UIDeletePresetRequest):
         update_models_dir(p)
 
     save_config(APP_CONFIG)
-    diff_choices, te_choices, vae_choices = scan_models()
+    diff_choices, te_choices, vae_choices, lora_choices = scan_models()
     return {
         "success": True,
         "models_dir": APP_CONFIG.get("models_dir"),
@@ -255,6 +264,7 @@ async def delete_preset_api(req: UIDeletePresetRequest):
         "diff_choices": diff_choices,
         "te_choices": te_choices,
         "vae_choices": vae_choices,
+        "lora_choices": lora_choices,
         "message": f"已从预设列表中删除目录：{target}",
     }
 
@@ -290,6 +300,13 @@ async def ui_generate(req: UIGenerateRequest):
                 diff_model=req.diff_model or "",
                 te_model=req.te_model or "",
                 vae_model=req.vae_model or "",
+                negative_prompt=req.negative_prompt or "",
+                cfg_scale=req.cfg_scale or 1.0,
+                loras=req.loras or [],
+                source="web",
+                init_image=req.init_image,
+                mask_image=req.mask_image,
+                strength=req.strength if req.strength is not None else 0.65,
             ):
                 payload = {
                     "pct": ev.get("pct", 0.0),
@@ -353,7 +370,7 @@ async def openai_images_generations(req: OpenAIGenRequest):
     actual_diff_model = APP_CONFIG.get("api_diff_model", "")
     try:
         async for event in engine.generate_image_stream(
-            prompt=req.prompt, width=w, height=h, steps=req.steps
+            prompt=req.prompt, width=w, height=h, steps=req.steps, source="api_dalle"
         ):
             if "out_path" in event:
                 out_path = event["out_path"]
@@ -440,7 +457,7 @@ async def openai_chat_completions(req: OpenAIChatRequest):
                     yield f"data: {json.dumps(chunk)}\n\n"
 
                 # 2. 监听流式推理事件，实时向 Agent 对话框推送阶段进度
-                async for event in engine.generate_image_stream(prompt=prompt, width=w, height=h, steps=steps):
+                async for event in engine.generate_image_stream(prompt=prompt, width=w, height=h, steps=steps, source="api_chat"):
                     desc = event.get("desc", "")
                     if desc and desc != last_reported_desc:
                         if "397" in desc or "265" in desc:
@@ -521,7 +538,7 @@ async def openai_chat_completions(req: OpenAIChatRequest):
     out_path = None
     actual_diff_model = APP_CONFIG.get("api_diff_model", "")
     try:
-        async for event in engine.generate_image_stream(prompt=prompt, width=w, height=h, steps=steps):
+        async for event in engine.generate_image_stream(prompt=prompt, width=w, height=h, steps=steps, source="api_chat"):
             if "out_path" in event:
                 out_path = event["out_path"]
             if "diff_model" in event:
@@ -556,4 +573,79 @@ async def openai_chat_completions(req: OpenAIChatRequest):
             "completion_tokens": len(reply_content),
             "total_tokens": len(prompt) + len(reply_content),
         },
+    }
+
+
+# ==============================================================================
+# 5. 历史画廊管理 API
+# ==============================================================================
+@router.get("/api/history")
+async def get_history_api(page: int = 1, page_size: int = 24, source: Optional[str] = None):
+    """获取历史画廊元数据列表，按生成时间倒序分页"""
+    if not OUTPUTS_JSON_DIR.exists():
+        return {"total": 0, "page": page, "page_size": page_size, "items": []}
+
+    records = []
+    for jf in OUTPUTS_JSON_DIR.glob("*.json"):
+        try:
+            with open(jf, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            fn = data.get("filename", f"{jf.stem}.png")
+            img_path = OUTPUTS_DIR / fn
+            # 校验对应图片文件是否存在，不存在则跳过（避免孤立残存记录）
+            if not img_path.exists():
+                continue
+            data["image_url"] = f"/outputs/{fn}"
+            if source and source != "all" and data.get("source") != source:
+                continue
+            records.append(data)
+        except Exception:
+            continue
+
+    # 按 created_at 倒序排列
+    records.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+
+    total = len(records)
+    start_idx = max(0, (page - 1) * page_size)
+    end_idx = start_idx + page_size
+    items = records[start_idx:end_idx]
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": items,
+    }
+
+
+@router.delete("/api/history/{filename}")
+async def delete_history_api(filename: str):
+    """删除指定的历史记录及其关联图片与 JSON 文件"""
+    safe_name = os.path.basename(filename)
+    stem = Path(safe_name).stem
+    img_path = OUTPUTS_DIR / safe_name
+    json_path = OUTPUTS_JSON_DIR / f"{stem}.json"
+
+    deleted_img = False
+    deleted_json = False
+
+    if img_path.exists():
+        try:
+            img_path.unlink()
+            deleted_img = True
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"删除图片文件失败: {e}")
+
+    if json_path.exists():
+        try:
+            json_path.unlink()
+            deleted_json = True
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "filename": safe_name,
+        "deleted_img": deleted_img,
+        "deleted_json": deleted_json,
     }

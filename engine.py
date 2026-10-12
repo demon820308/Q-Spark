@@ -86,6 +86,10 @@ MODELS_DIR = Path(_raw_models) if Path(_raw_models).is_absolute() else (BASE_DIR
 _raw_outputs = APP_CONFIG.get("outputs_dir", "outputs")
 OUTPUTS_DIR = Path(_raw_outputs) if Path(_raw_outputs).is_absolute() else (BASE_DIR / _raw_outputs).resolve()
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUTS_JSON_DIR = OUTPUTS_DIR / "json"
+OUTPUTS_JSON_DIR.mkdir(parents=True, exist_ok=True)
+INPUTS_DIR = BASE_DIR / "inputs"
+INPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_api_model_status_text() -> str:
@@ -111,6 +115,46 @@ def get_viggle_6step_sigmas(width: int, height: int) -> str:
     nodes = [1.0, 0.9375, 0.875, 0.75, 0.5, 0.25]
     sigmas = [math.exp(mu) / (math.exp(mu) + (1.0 / t - 1.0)) for t in nodes] + [0.0]
     return ",".join(f"{s:.6f}" for s in sigmas)
+
+
+def compute_aspect_ratio_str(width: int, height: int) -> str:
+    """计算标准画幅比例简写 (如 1:1, 16:9, 3:4)"""
+    presets = {
+        (1024, 1024): "1:1",
+        (512, 512): "1:1",
+        (768, 1024): "3:4",
+        (864, 1152): "3:4",
+        (768, 1360): "9:16",
+        (832, 1248): "2:3",
+        (1024, 768): "4:3",
+        (1360, 768): "16:9",
+        (1248, 832): "3:2",
+        (1536, 640): "21:9",
+    }
+    if (width, height) in presets:
+        return presets[(width, height)]
+    ratio = width / max(height, 1)
+    if abs(ratio - 1.0) < 0.05:
+        return "1:1"
+    if abs(ratio - 16 / 9) < 0.05:
+        return "16:9"
+    if abs(ratio - 9 / 16) < 0.05:
+        return "9:16"
+    if abs(ratio - 4 / 3) < 0.05:
+        return "4:3"
+    if abs(ratio - 3 / 4) < 0.05:
+        return "3:4"
+    if abs(ratio - 3 / 2) < 0.05:
+        return "3:2"
+    if abs(ratio - 2 / 3) < 0.05:
+        return "2:3"
+    if abs(ratio - 21 / 9) < 0.08 or abs(ratio - 2.4) < 0.05:
+        return "21:9"
+    g = math.gcd(width, height)
+    w_r, h_r = width // g, height // g
+    if w_r <= 32 and h_r <= 32:
+        return f"{w_r}:{h_r}"
+    return f"{width}:{height}"
 
 
 DEFAULT_STEPS = 8
@@ -145,6 +189,7 @@ def scan_models(base_path: Optional[Path | str] = None):
     diff_dir = get_sub_dir(root, ["diffusion_models", "diffusion"])
     te_dir = get_sub_dir(root, ["text_encoders", "text_encoder"])
     vae_dir = root / "vae"
+    lora_dir = get_sub_dir(root, ["loras", "lora"])
 
     valid_exts = {".gguf", ".safetensors"}
 
@@ -160,6 +205,10 @@ def scan_models(base_path: Optional[Path | str] = None):
         f.name for f in vae_dir.glob("*") if f.is_file() and f.suffix.lower() in valid_exts
     ] if vae_dir.exists() else []
 
+    lora_models = [
+        f.name for f in lora_dir.glob("*") if f.is_file() and f.suffix.lower() in valid_exts
+    ] if lora_dir.exists() else []
+
     def sort_qwen(items: list[str]) -> list[str]:
         qwen_items = [x for x in items if "qwen" in x.lower()]
         other_items = [x for x in items if "qwen" not in x.lower()]
@@ -168,11 +217,13 @@ def scan_models(base_path: Optional[Path | str] = None):
     diff_models = sort_qwen(diff_models)
     te_models = sort_qwen(te_models)
     vae_models = sort_qwen(vae_models)
+    lora_models = sorted(lora_models)
 
     return (
         diff_models,
         te_models,
         vae_models,
+        lora_models,
     )
 
 
@@ -404,6 +455,93 @@ class InferenceEngine:
                 raise RuntimeError("sd-server 进程意外退出，请检查显存。")
         raise TimeoutError("等待 sd-server 启动超时。")
 
+    def prepare_init_image(self, init_image_input: Optional[str]) -> Optional[Path]:
+        """将传入的 Base64 图片或文件路径规整为磁盘上的有效输入图片路径"""
+        if not init_image_input or not isinstance(init_image_input, str):
+            return None
+
+        INPUTS_DIR.mkdir(parents=True, exist_ok=True)
+
+        # 1. 带 Data URL 前缀的 Base64 数据
+        if "base64," in init_image_input:
+            try:
+                _, b64_data = init_image_input.split("base64,", 1)
+                raw_bytes = base64.b64decode(b64_data)
+                saved_path = INPUTS_DIR / f"init_{int(time.time())}_{random.randint(1000, 9999)}.png"
+                saved_path.write_bytes(raw_bytes)
+                return saved_path
+            except Exception as ex:
+                print(f"[Warning] 解析 Base64 底图失败: {ex}")
+                return None
+
+        # 2. 纯 Base64 数据
+        if len(init_image_input) > 200 and not init_image_input.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            try:
+                raw_bytes = base64.b64decode(init_image_input)
+                saved_path = INPUTS_DIR / f"init_{int(time.time())}_{random.randint(1000, 9999)}.png"
+                saved_path.write_bytes(raw_bytes)
+                return saved_path
+            except Exception:
+                pass
+
+        # 3. 磁盘现有文件或文件名
+        cand = Path(init_image_input)
+        if cand.is_file():
+            return cand
+
+        cand_out = OUTPUTS_DIR / init_image_input
+        if cand_out.is_file():
+            return cand_out
+
+        cand_in = INPUTS_DIR / init_image_input
+        if cand_in.is_file():
+            return cand_in
+
+        if init_image_input.startswith("/outputs/"):
+            clean_name = init_image_input.replace("/outputs/", "")
+            cand_url = OUTPUTS_DIR / clean_name
+            if cand_url.is_file():
+                return cand_url
+
+        return None
+
+    def prepare_mask_image(self, mask_image_input: Optional[str]) -> Optional[Path]:
+        """将传入的 Base64 黑白蒙版或文件路径规整为磁盘上的有效蒙版图片路径"""
+        if not mask_image_input or not isinstance(mask_image_input, str):
+            return None
+
+        INPUTS_DIR.mkdir(parents=True, exist_ok=True)
+
+        if "base64," in mask_image_input:
+            try:
+                _, b64_data = mask_image_input.split("base64,", 1)
+                raw_bytes = base64.b64decode(b64_data)
+                saved_path = INPUTS_DIR / f"mask_{int(time.time())}_{random.randint(1000, 9999)}.png"
+                saved_path.write_bytes(raw_bytes)
+                return saved_path
+            except Exception as ex:
+                print(f"[Warning] 解析 Base64 蒙版失败: {ex}")
+                return None
+
+        if len(mask_image_input) > 200 and not mask_image_input.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            try:
+                raw_bytes = base64.b64decode(mask_image_input)
+                saved_path = INPUTS_DIR / f"mask_{int(time.time())}_{random.randint(1000, 9999)}.png"
+                saved_path.write_bytes(raw_bytes)
+                return saved_path
+            except Exception:
+                pass
+
+        cand = Path(mask_image_input)
+        if cand.is_file():
+            return cand
+
+        cand_in = INPUTS_DIR / mask_image_input
+        if cand_in.is_file():
+            return cand_in
+
+        return None
+
     async def generate_image_stream(
         self,
         prompt: str,
@@ -414,13 +552,21 @@ class InferenceEngine:
         diff_model: str = "",
         te_model: str = "",
         vae_model: str = "",
+        negative_prompt: str = "",
+        cfg_scale: Optional[float] = None,
+        loras: Optional[list] = None,
+        source: str = "web",
+        init_image: Optional[str] = None,
+        mask_image: Optional[str] = None,
+        strength: Optional[float] = 0.65,
     ) -> AsyncGenerator[dict, None]:
         async with self.lock:
+            start_time = time.time()
             self.last_active = time.time()
             if seed == -1:
                 seed = random.randint(1, 2**31 - 1)
 
-            diff_list, te_list, vae_list = scan_models()
+            diff_list, te_list, vae_list, lora_list = scan_models()
             diff_model = diff_model or APP_CONFIG.get("api_diff_model") or diff_list[0]
             te_model = te_model or APP_CONFIG.get("api_te_model") or te_list[0]
             vae_model = vae_model or APP_CONFIG.get("api_vae_model") or vae_list[0]
@@ -428,6 +574,7 @@ class InferenceEngine:
             if steps is None or int(steps) <= 0:
                 steps = 6 if "6step" in (diff_model or "").lower() else (APP_CONFIG.get("api_steps") or DEFAULT_STEPS)
             steps = int(steps)
+            effective_cfg = float(cfg_scale) if (cfg_scale is not None and float(cfg_scale) > 0) else DEFAULT_CFG
 
             out_filename = f"img_{int(time.time())}_{seed}.png"
             out_filepath = OUTPUTS_DIR / out_filename
@@ -435,15 +582,26 @@ class InferenceEngine:
             diff_path = resolve_model_file(["diffusion_models", "diffusion"], diff_model)
             te_path = resolve_model_file(["text_encoders", "text_encoder"], te_model)
             vae_path = resolve_model_file(["vae"], vae_model)
+            lora_dir = get_sub_dir(MODELS_DIR, ["loras", "lora"])
+
+            # 组装 Prompt 与 LoRA 宏
+            final_prompt = prompt
+            if loras:
+                for lora in loras:
+                    l_name = lora.get("name", "") if isinstance(lora, dict) else str(lora)
+                    l_weight = lora.get("weight", 0.8) if isinstance(lora, dict) else 0.8
+                    stem = Path(l_name).stem
+                    if l_name and f"<lora:{l_name}" not in final_prompt and f"<lora:{stem}" not in final_prompt:
+                        final_prompt = f"{final_prompt} <lora:{stem}:{l_weight}>"
 
             cmd = [
                 str(SD_CLI_EXE),
                 "--diffusion-model", to_rel_or_abs(diff_path),
                 "--llm", to_rel_or_abs(te_path),
                 "--vae", to_rel_or_abs(vae_path),
-                "-p", prompt,
+                "-p", final_prompt,
                 "--steps", str(steps),
-                "--cfg-scale", str(DEFAULT_CFG),
+                "--cfg-scale", str(effective_cfg),
                 "--sampling-method", DEFAULT_SAMPLER,
                 "-W", str(width),
                 "-H", str(height),
@@ -453,16 +611,104 @@ class InferenceEngine:
                 "--backend", "CUDA0",
                 "-o", to_rel_or_abs(out_filepath),
             ]
+            if negative_prompt and negative_prompt.strip():
+                cmd.extend(["-n", negative_prompt.strip()])
+            if lora_dir.exists():
+                cmd.extend(["--lora-model-dir", to_rel_or_abs(lora_dir), "--lora-apply-mode", "auto"])
+
+            # 图生图 (img2img) 与 局部重绘 (Inpainting) 注入
+            init_img_path = self.prepare_init_image(init_image)
+            mask_img_path = self.prepare_mask_image(mask_image) if init_img_path else None
+            effective_strength = max(0.05, min(1.0, float(strength or 0.65))) if init_img_path else None
+            if init_img_path and init_img_path.exists():
+                cmd.extend(["-i", to_rel_or_abs(init_img_path), "--strength", str(round(effective_strength, 2))])
+                if mask_img_path and mask_img_path.exists():
+                    cmd.extend(["--mask", to_rel_or_abs(mask_img_path)])
+
             if steps == 6:
                 cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
             elif steps == 8:
                 cmd.extend(["--sigmas", TURBO_SIGMAS])
 
-            # 策略 A：按需冷启动模式 (流式输出 + 实时进度)
-            if self.mode == "on_demand":
+            policy_map = {
+                "on_demand": "即用即走（按需模式）",
+                "always_on": "常驻运行（显存常驻）",
+                "auto_unload": "智能休眠（自动释放）",
+            }
+            policy_text = policy_map.get(self.mode, "按需模式")
+
+            lora_log = ""
+            if loras:
+                items = [
+                    f"{l.get('name', str(l))} (权重: {l.get('weight', 0.8)})"
+                    if isinstance(l, dict) else str(l)
+                    for l in loras if l
+                ]
+                if items:
+                    lora_log = f">>> 挂载 LoRA: {', '.join(items)}\n"
+
+            if init_img_path and mask_img_path:
+                task_mode = "inpaint"
+                mode_log = f">>> 任务模式: 🖌️ 局部重绘 (Inpainting) | 底图: {init_img_path.name} | 蒙版: {mask_img_path.name} | 重绘幅度: {effective_strength}\n"
+            elif init_img_path:
+                task_mode = "img2img"
+                mode_log = f">>> 任务模式: 🖼️ 图生图 (img2img) | 底图: {init_img_path.name} | 重绘幅度: {effective_strength}\n"
+            else:
+                task_mode = "txt2img"
+                mode_log = ">>> 任务模式: 🎨 文生图 (txt2img)\n"
+
+            info_log = (
+                f"{mode_log}"
+                f">>> 任务规格: {width}x{height} | 采样步数: {steps} | CFG: {effective_cfg} | 随机种子: {seed}\n"
+                f">>> 显存策略: {policy_text}\n"
+                f">>> 扩散模型: {diff_model}\n"
+                f">>> 文本编码: {te_model}\n"
+                f">>> VAE 解码: {vae_model}\n"
+                f"{lora_log}"
+            )
+            yield {"pct": 0.05, "desc": "初始化任务配置...", "log": info_log}
+
+            def _save_meta(out_fp: Path, current_diff: str):
+                dur = round(time.time() - start_time, 2)
+                meta = {
+                    "id": out_fp.stem,
+                    "filename": out_fp.name,
+                    "mode": task_mode,
+                    "source": source,
+                    "prompt": prompt,
+                    "negative_prompt": negative_prompt or "",
+                    "cfg_scale": effective_cfg,
+                    "steps": steps,
+                    "seed": seed,
+                    "width": width,
+                    "height": height,
+                    "aspect_ratio": compute_aspect_ratio_str(width, height),
+                    "diff_model": current_diff,
+                    "te_model": te_model,
+                    "vae_model": vae_model,
+                    "loras": loras or [],
+                    "vram_mode": self.mode,
+                    "duration_seconds": dur,
+                    "created_at": int(time.time()),
+                    "created_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                    "init_image": init_img_path.name if init_img_path else None,
+                    "mask_image": mask_img_path.name if mask_img_path else None,
+                    "strength": effective_strength if init_img_path else None,
+                }
+                try:
+                    OUTPUTS_JSON_DIR.mkdir(parents=True, exist_ok=True)
+                    with open(OUTPUTS_JSON_DIR / f"{out_fp.stem}.json", "w", encoding="utf-8") as f:
+                        json.dump(meta, f, indent=2, ensure_ascii=False)
+                except Exception as ex:
+                    print(f"[Warning] 保存历史元数据失败: {ex}")
+                return meta
+
+            # 策略 A：按需冷启动模式 (流式输出 + 实时进度) 或者是图生图任务
+            if self.mode == "on_demand" or init_img_path:
                 async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
                     yield event
-                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model}
+                meta = _save_meta(out_filepath, diff_model)
+                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
                 return
 
             # 策略 B & C：常驻或自动休眠模式
@@ -474,7 +720,7 @@ class InferenceEngine:
                     resp = await client.post(
                         f"http://127.0.0.1:{self.server_port}/v1/images/generations",
                         json={
-                            "prompt": prompt,
+                            "prompt": final_prompt,
                             "size": f"{width}x{height}",
                             "seed": seed,
                             "response_format": "b64_json",
@@ -487,14 +733,16 @@ class InferenceEngine:
                     img_bytes = base64.b64decode(b64_str)
                     with open(out_filepath, "wb") as f:
                         f.write(img_bytes)
-                    yield {"pct": 1.0, "desc": "生成完成！", "log": ">>> 图像已成功保存。\n", "out_path": str(out_filepath), "diff_model": diff_model}
+                    meta = _save_meta(out_filepath, diff_model)
+                    yield {"pct": 1.0, "desc": "生成完成！", "log": ">>> 图像已成功保存。\n", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
                     return
             except Exception as e:
                 print(f"\n[Warning] 常驻模式异常，正在降级回退至 sd-cli 流式执行: {e}\n")
                 self.stop_server()
                 async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
                     yield event
-                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model}
+                meta = _save_meta(out_filepath, diff_model)
+                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
 
     async def idle_checker_loop(self):
         while True:

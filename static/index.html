@@ -15,11 +15,18 @@
             <div class="dark-title">Q-Spark Studio</div>
             <div class="dark-subtitle">生图控制台 · stable-diffusion.cpp 引擎 · 支持 Agent API</div>
         </div>
+        <div class="header-nav-tabs">
+            <button class="nav-tab active" id="tab-create-btn">🎨 图像创作 (Create)</button>
+            <button class="nav-tab" id="tab-gallery-btn">🖼️ 历史画廊 (Gallery)</button>
+        </div>
         <div class="header-actions">
             <span class="vram-badge" id="vram-status-text">显存状态：检测中...</span>
             <button class="btn-flush" id="flush-btn">⚡ 立即清空显存 (Flush VRAM)</button>
         </div>
     </header>
+
+    <!-- 图像创作主视图 -->
+    <div id="view-create">
 
     <!-- 硬件指标监控卡片 -->
     <section class="metrics-grid">
@@ -57,8 +64,56 @@
         <!-- 左侧输入与控制面板 -->
         <div class="card">
             <div class="form-group">
-                <label for="prompt-input">提示词 (Prompt)</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label for="prompt-input" style="margin: 0;">提示词 (Prompt)</label>
+                    <button type="button" class="btn-coral" id="generate-btn-top" style="width: auto; padding: 4px 14px; font-size: 0.82rem; border-radius: 6px;">▶ 开始生成</button>
+                </div>
                 <textarea id="prompt-input" rows="5" placeholder="输入希望生成的画面描述（支持中英文，已去除所有审查限制）..."></textarea>
+            </div>
+
+            <!-- 图生图参考底图卡片 -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="margin: 0; font-weight: 500; font-size: 0.88rem;">🖼️ 参考底图 (图生图 img2img / 选填，留空为文生图)</label>
+                    <button id="clear-init-img-btn" class="btn-secondary" style="display: none; padding: 2px 8px; font-size: 0.78rem; color: #ff6b6b;">✕ 移除底图</button>
+                </div>
+                
+                <!-- 未上传底图的占位拖拽区 -->
+                <div id="init-img-dropzone" class="dropzone-box">
+                    <input type="file" id="init-img-file-input" accept="image/*" style="display: none;">
+                    <div class="dropzone-hint">
+                        <span style="font-size: 1.3rem;">📥</span>
+                        <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">点击上传或拖拽底图（支持直接 Ctrl+V 粘贴图片）</div>
+                    </div>
+                </div>
+
+                <!-- 已上传底图的预览与参数控制 -->
+                <div id="init-img-preview-box" class="init-preview-container" style="display: none;">
+                    <div class="init-thumb-wrapper">
+                        <img id="init-img-preview" src="" alt="底图预览">
+                        <div id="init-img-size-badge" class="init-size-badge">-- x --</div>
+                    </div>
+                    <div class="init-controls">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <label for="strength-input" style="font-size: 0.82rem; margin: 0; font-weight: 500;">重绘幅度 (Strength)</label>
+                            <span id="strength-val-text" style="font-size: 0.82rem; color: var(--primary); font-weight: 600;">0.65</span>
+                        </div>
+                        <input type="range" id="strength-input" min="0.10" max="1.00" step="0.05" value="0.65" style="width: 100%; accent-color: var(--primary);">
+                        <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px;">
+                            * 0.3~0.5 细微调整 | 0.6~0.7 风格重构 | 0.8+ 几乎重画
+                        </div>
+                        <button id="apply-init-size-btn" class="btn-secondary" style="font-size: 0.78rem; padding: 5px 8px; margin-top: 8px; width: 100%;">
+                            📐 自动匹配底图宽高比例
+                        </button>
+                        <button id="open-inpaint-btn" class="btn-secondary" style="font-size: 0.78rem; padding: 5px 8px; margin-top: 6px; width: 100%; border-color: rgba(236,72,153,0.4); color: #f472b6;">
+                            🖌️ 涂抹局部重绘区域 (Inpaint)
+                        </button>
+                        <div id="mask-status-badge" class="mask-status-badge" style="display: none;">
+                            <span>✓ 蒙版已就绪 (局部重绘)</span>
+                            <button id="clear-mask-btn" style="background: none; border: none; color: #ff6b6b; cursor: pointer; font-size: 0.76rem;">✕ 移除</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -152,6 +207,38 @@
                     <div id="api-model-info" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px;"></div>
                 </div>
             </details>
+ 
+            <!-- 高级参数设置（传统模型 / CFG / 负面词 / LoRA） -->
+            <details class="model-select-group" style="margin-bottom: 16px;" id="advanced-params-drawer">
+                <summary style="font-size: 0.88rem; font-weight: 500; cursor: pointer; color: var(--text-muted); padding: 4px 0;">⚙️ 高级控制与传统模型扩展（负面词 / CFG / LoRA）</summary>
+                <div style="margin-top: 12px;">
+                    <div class="form-group">
+                        <label for="negative-prompt-input">负面提示词 (Negative Prompt)</label>
+                        <textarea id="negative-prompt-input" rows="2" placeholder="过滤不希望出现的元素（如 blurry, bad anatomy... 选填，Turbo 留空）"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label for="cfg-input">提示词引导度 (CFG Scale)</label>
+                            <span id="cfg-val-text" style="font-size: 0.82rem; color: var(--primary); font-weight: 600;">1.0</span>
+                        </div>
+                        <input type="range" id="cfg-input" min="1.0" max="15.0" step="0.5" value="1.0" style="width: 100%; accent-color: var(--primary);">
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">* Qwen/Z-Image Turbo 保持 1.0；传统 SD1.5/SDXL 推荐 5.0 ~ 7.0</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🎨 挂载 LoRA 模型</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="lora-select" style="flex: 2;">
+                                <option value="">-- 选择 LoRA 模型 --</option>
+                            </select>
+                            <input type="number" id="lora-weight" value="0.8" step="0.1" min="0.1" max="2.0" style="width: 70px;" title="权重 (0.1 ~ 2.0)">
+                            <button type="button" class="btn-secondary" id="add-lora-btn" style="white-space: nowrap; padding: 0 12px;">+ 添加</button>
+                        </div>
+                        <div id="lora-tags-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;"></div>
+                    </div>
+                </div>
+            </details>
 
             <!-- 生成按钮与动态进度条 -->
             <button class="btn-coral" id="generate-btn">开始生成图像 (Generate)</button>
@@ -197,6 +284,147 @@
             </div>
         </div>
     </footer>
+    </div> <!-- /#view-create -->
+
+    <!-- 历史画廊主视图 -->
+    <div id="view-gallery" style="display: none;">
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px; padding: 14px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: 500; font-size: 0.90rem;">来源筛选：</span>
+                <select id="gallery-source-filter" style="width: auto; padding: 6px 12px;">
+                    <option value="all">全部来源</option>
+                    <option value="web">Web 页面创作</option>
+                    <option value="api_dalle">OpenAI DALL-E API</option>
+                    <option value="api_chat">Agent 对话流 API</option>
+                </select>
+                <button class="btn-secondary" id="gallery-refresh-btn" style="padding: 6px 14px;">🔄 刷新画廊</button>
+            </div>
+            <div id="gallery-stats-text" style="color: var(--text-muted); font-size: 0.88rem;">共 0 张生成记录</div>
+        </div>
+
+        <div id="gallery-empty-box" class="card" style="display: none; text-align: center; padding: 60px 20px; color: var(--text-muted);">
+            <div style="font-size: 2.5rem; margin-bottom: 12px;">🖼️</div>
+            <div style="font-size: 1.1rem; margin-bottom: 8px;">暂无历史生成记录</div>
+            <div style="font-size: 0.88rem;">在创作区生成或通过 Agent API 调用的图片都会在此自动归档。</div>
+        </div>
+
+        <div id="gallery-grid" class="gallery-grid"></div>
+
+        <div class="gallery-pagination" id="gallery-pagination" style="display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 24px;">
+            <button class="btn-secondary" id="gallery-prev-btn" disabled>◀ 上一页</button>
+            <span id="gallery-page-info" style="font-size: 0.88rem; color: var(--text-muted);">第 1 / 1 页</span>
+            <button class="btn-secondary" id="gallery-next-btn" disabled>下一页 ▶</button>
+        </div>
+    </div>
+
+    <!-- 画廊大图与元数据详情弹窗 -->
+    <div id="gallery-modal" class="modal-overlay">
+        <div class="modal-detail-card">
+            <div class="modal-detail-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 1.15rem; font-weight: 600; color: var(--text-title);">🖼️ 图像档案与元数据详情</div>
+                    <button id="modal-detail-close-btn" class="btn-secondary" style="padding: 4px 10px; font-size: 0.9rem;">✕ 关闭</button>
+                </div>
+                <div class="modal-header-meta">
+                    <span id="modal-meta-time" title="生成时间">📅 --</span>
+                    <span class="meta-dot">·</span>
+                    <span id="modal-meta-size" title="规格尺寸与画幅比例">📐 --</span>
+                    <span class="meta-dot">·</span>
+                    <span id="modal-meta-source" class="gallery-tag source-web" title="生成来源">--</span>
+                    <span class="meta-dot">·</span>
+                    <span id="modal-meta-duration" title="生成耗时">⚡ --</span>
+                </div>
+            </div>
+            <div class="modal-detail-body">
+                <div class="modal-img-col" id="modal-img-wrap" title="点击查看 1:1 真实原图">
+                    <img id="modal-img" src="" alt="大图详情">
+                    <div class="modal-img-zoom-hint">🔍 点击查看 1:1 原图</div>
+                </div>
+                <div class="modal-info-col">
+                    <div>
+                        <strong style="font-size: 0.85rem;">正向提示词 (Prompt)：</strong>
+                        <div id="modal-prompt" class="meta-code-box"></div>
+                    </div>
+                    <div id="modal-neg-row" style="display: none;">
+                        <strong style="font-size: 0.85rem;">负面提示词 (Negative Prompt)：</strong>
+                        <div id="modal-negative" class="meta-code-box"></div>
+                    </div>
+                    <div class="meta-grid-detail">
+                        <div><strong>采样步数：</strong> <span id="modal-steps">--</span></div>
+                        <div><strong>引导度 (CFG)：</strong> <span id="modal-cfg">--</span></div>
+                        <div><strong>随机种子：</strong> <span id="modal-seed">--</span></div>
+                        <div><strong>显存策略：</strong> <span id="modal-vram-mode">--</span></div>
+                    </div>
+                    <div>
+                        <strong style="font-size: 0.85rem;">模型组合：</strong>
+                        <div id="modal-models" style="font-size: 0.80rem; color: var(--text-mono); word-break: break-all; margin-top: 4px;"></div>
+                    </div>
+                    <div id="modal-lora-row" style="display: none;">
+                        <strong style="font-size: 0.85rem;">挂载 LoRA：</strong>
+                        <div id="modal-loras" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+                        <button class="btn-coral" id="modal-reuse-btn" style="flex: 1;">⚡ 参数重绘</button>
+                        <button class="btn-secondary" id="modal-img2img-btn" style="flex: 1;">🔄 图生图</button>
+                        <button class="btn-secondary" id="modal-inpaint-btn" style="flex: 1; border-color: rgba(236,72,153,0.4); color: #f472b6;">🖌️ 局部重绘</button>
+                        <button class="btn-secondary" id="modal-copy-btn" style="flex: 0.8;">📋 复制提示词</button>
+                        <a id="modal-dl-btn" href="" download class="btn-secondary" style="text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 0 10px;">⬇️ 下载</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 局部重绘 (Inpainting) 蒙版涂抹弹窗工作台 -->
+    <div id="inpaint-modal" class="modal-overlay">
+        <div class="inpaint-modal-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border-subtle);">
+                <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-title);">🖌️ 局部重绘蒙版涂抹工作台 (Inpainting Canvas)</div>
+                <button id="inpaint-close-btn" class="btn-secondary" style="padding: 4px 10px; font-size: 0.9rem;">✕ 关闭</button>
+            </div>
+            
+            <div class="inpaint-toolbar">
+                <div class="inpaint-tools-left">
+                    <button id="tool-brush-btn" class="tool-btn active">🖌️ 画笔</button>
+                    <button id="tool-eraser-btn" class="tool-btn">🧹 橡皮擦</button>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-left: 6px;">
+                        <span style="font-size: 0.80rem; color: var(--text-muted);">粗细:</span>
+                        <input type="range" id="brush-size-input" min="5" max="150" value="40" style="width: 90px; accent-color: var(--primary);">
+                        <span id="brush-size-text" style="font-size: 0.80rem; font-family: var(--font-mono); color: var(--primary); min-width: 32px;">40px</span>
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 0.80rem; cursor: pointer; margin-left: 8px; user-select: none;">
+                        <input type="checkbox" id="mask-invert-check">
+                        <span>🔄 反转蒙版 (重绘背景保留主体)</span>
+                    </label>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="tool-clear-btn" class="btn-secondary" style="font-size: 0.82rem; padding: 4px 10px;">🗑️ 清空涂抹</button>
+                    <button id="inpaint-apply-btn" class="btn-coral" style="font-size: 0.82rem; padding: 4px 16px;">✓ 完成并应用蒙版</button>
+                </div>
+            </div>
+
+            <div class="inpaint-canvas-viewport" id="inpaint-viewport">
+                <div class="inpaint-stage-wrapper" id="inpaint-stage">
+                    <img id="inpaint-bg-img" class="inpaint-bg-img" src="" alt="涂抹底图">
+                    <canvas id="inpaint-mask-canvas" class="inpaint-mask-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 沉浸式全屏原图查看器 (方案 A) -->
+    <div id="fullscreen-viewer" class="fullscreen-viewer">
+        <div class="fullscreen-viewer-bar">
+            <div class="fs-info-text" id="fs-viewer-title">原图查看器</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="fs-zoom-toggle-btn" class="btn-secondary" style="font-size: 0.82rem; padding: 5px 12px;">🔍 切换 1:1 / 适应屏幕</button>
+                <button id="fs-close-btn" class="btn-secondary" style="font-size: 0.82rem; padding: 5px 12px;">✕ 关闭 (ESC)</button>
+            </div>
+        </div>
+        <div class="fullscreen-viewer-viewport" id="fs-viewport">
+            <img id="fs-viewer-img" class="fit-screen" src="" alt="全屏大图" draggable="false">
+        </div>
+    </div>
 
     <!-- 全局居中深色模态弹窗 -->
     <div id="custom-modal" class="modal-overlay">
@@ -217,6 +445,12 @@
         let isGenerating = false;
         let logLines = ["等待生成指令...\n"];
         let docLoaded = false;
+        let currentLoRAs = [];
+        let galleryPage = 1;
+        let galleryPageSize = 24;
+        let galleryTotal = 0;
+        let currentGalleryItems = [];
+        let activeDetailItem = null;
 
         // 简易 Markdown 解析器 (用于说明文档)
         function renderMarkdown(md) {
@@ -366,6 +600,7 @@
                 populateSelect('diff-select', data.diff_choices, data.config.api_diff_model);
                 populateSelect('te-select', data.te_choices, data.config.api_te_model);
                 populateSelect('vae-select', data.vae_choices, data.config.api_vae_model);
+                populateSelect('lora-select', data.lora_choices, '');
 
                 // 显存策略
                 const policy = data.engine_mode || 'on_demand';
@@ -381,7 +616,21 @@
 
         function populateSelect(id, choices, selectedVal) {
             const sel = document.getElementById(id);
+            if (!sel) return;
             sel.innerHTML = '';
+            if (id === 'lora-select') {
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.text = (choices && choices.length > 0) ? '-- 选择 LoRA 模型 --' : '⚠️ (未检测到 LoRA 模型)';
+                sel.appendChild(defaultOpt);
+                (choices || []).forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.text = c;
+                    sel.appendChild(opt);
+                });
+                return;
+            }
             if (!choices || choices.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = '';
@@ -456,6 +705,7 @@
                 populateSelect('diff-select', data.diff_choices);
                 populateSelect('te-select', data.te_choices);
                 populateSelect('vae-select', data.vae_choices);
+                populateSelect('lora-select', data.lora_choices, '');
                 updateStepsSuggestion();
                 alert(data.message);
             } catch (err) {
@@ -496,6 +746,7 @@
                 populateSelect('diff-select', data.diff_choices);
                 populateSelect('te-select', data.te_choices);
                 populateSelect('vae-select', data.vae_choices);
+                populateSelect('lora-select', data.lora_choices, '');
                 updateStepsSuggestion();
                 alert("✅ 已成功添加并切换至新模型库！\n" + data.message);
             } catch (err) {
@@ -528,6 +779,7 @@
                 populateSelect('diff-select', data.diff_choices);
                 populateSelect('te-select', data.te_choices);
                 populateSelect('vae-select', data.vae_choices);
+                populateSelect('lora-select', data.lora_choices, '');
                 updateStepsSuggestion();
                 alert(data.message);
             } catch (err) {
@@ -638,6 +890,7 @@
             }
 
             const genBtn = document.getElementById('generate-btn');
+            const genBtnTop = document.getElementById('generate-btn-top');
             const pWrapper = document.getElementById('progress-wrapper');
             const pDesc = document.getElementById('progress-desc');
             const pPct = document.getElementById('progress-pct');
@@ -647,11 +900,16 @@
             isGenerating = true;
             genBtn.disabled = true;
             genBtn.innerText = "⏳ 图像生成中...";
+            if (genBtnTop) {
+                genBtnTop.disabled = true;
+                genBtnTop.innerText = "⏳ 图像生成中...";
+            }
             pWrapper.classList.add('active');
             pFill.style.width = '5%';
             pPct.innerText = '5%';
             pDesc.innerText = '正在启动任务...';
             infoBox.innerText = '正在启动生成任务...';
+            logLines = [];
             appendLogs(">>> 任务开始...\n");
 
             const payload = {
@@ -663,7 +921,13 @@
                 policy: document.querySelector('input[name="policy"]:checked').value,
                 diff_model: document.getElementById('diff-select').value,
                 te_model: document.getElementById('te-select').value,
-                vae_model: document.getElementById('vae-select').value
+                vae_model: document.getElementById('vae-select').value,
+                negative_prompt: document.getElementById('negative-prompt-input')?.value?.trim() || "",
+                cfg_scale: parseFloat(document.getElementById('cfg-input')?.value) || 1.0,
+                loras: currentLoRAs || [],
+                init_image: currentInitImage || null,
+                mask_image: (currentInitImage && currentMaskBase64) ? currentMaskBase64 : null,
+                strength: currentInitImage ? (parseFloat(document.getElementById('strength-input')?.value) || 0.65) : null
             };
 
             try {
@@ -735,11 +999,870 @@
                 isGenerating = false;
                 genBtn.disabled = false;
                 genBtn.innerText = "开始生成图像 (Generate)";
+                if (genBtnTop) {
+                    genBtnTop.disabled = false;
+                    genBtnTop.innerText = "▶ 开始生成";
+                }
                 setTimeout(() => {
                     pWrapper.classList.remove('active');
                 }, 1200);
                 fetchMetrics();
             }
+        });
+
+        // 顶部紧凑生成按钮联动触发主生成流程
+        document.getElementById('generate-btn-top')?.addEventListener('click', () => {
+            document.getElementById('generate-btn').click();
+        });
+
+        // Tab 切换逻辑
+        const tabCreateBtn = document.getElementById('tab-create-btn');
+        const tabGalleryBtn = document.getElementById('tab-gallery-btn');
+        const viewCreate = document.getElementById('view-create');
+        const viewGallery = document.getElementById('view-gallery');
+
+        function switchTab(tab) {
+            if (tab === 'gallery') {
+                tabCreateBtn.classList.remove('active');
+                tabGalleryBtn.classList.add('active');
+                viewCreate.style.display = 'none';
+                viewGallery.style.display = 'block';
+                fetchGallery(1);
+            } else {
+                tabGalleryBtn.classList.remove('active');
+                tabCreateBtn.classList.add('active');
+                viewGallery.style.display = 'none';
+                viewCreate.style.display = 'block';
+            }
+        }
+        tabCreateBtn.addEventListener('click', () => switchTab('create'));
+        tabGalleryBtn.addEventListener('click', () => switchTab('gallery'));
+
+        // CFG 数值动态展示
+        const cfgInput = document.getElementById('cfg-input');
+        const cfgValText = document.getElementById('cfg-val-text');
+        if (cfgInput && cfgValText) {
+            cfgInput.addEventListener('input', () => {
+                cfgValText.innerText = parseFloat(cfgInput.value).toFixed(1);
+            });
+        }
+
+        // LoRA 挂载列表管理
+        function renderLoRATags() {
+            const container = document.getElementById('lora-tags-container');
+            if (!container) return;
+            container.innerHTML = '';
+            currentLoRAs.forEach((item, index) => {
+                const badge = document.createElement('div');
+                badge.className = 'lora-badge';
+                badge.innerHTML = `<span>🏷️ ${item.name} (${item.weight})</span><button type="button" title="移除">✕</button>`;
+                badge.querySelector('button').addEventListener('click', () => {
+                    currentLoRAs.splice(index, 1);
+                    renderLoRATags();
+                });
+                container.appendChild(badge);
+            });
+        }
+
+        document.getElementById('add-lora-btn').addEventListener('click', () => {
+            const sel = document.getElementById('lora-select');
+            const val = sel.value;
+            if (!val) {
+                showAlert("请先在下拉框中选择要挂载的 LoRA 模型！");
+                return;
+            }
+            const weight = parseFloat(document.getElementById('lora-weight').value) || 0.8;
+            if (currentLoRAs.some(x => x.name === val)) {
+                showAlert("该 LoRA 模型已在挂载列表中！");
+                return;
+            }
+            currentLoRAs.push({ name: val, weight: weight });
+            renderLoRATags();
+        });
+
+        // 历史画廊数据获取与渲染
+        async function fetchGallery(page = 1) {
+            galleryPage = page;
+            const source = document.getElementById('gallery-source-filter').value;
+            try {
+                const res = await fetch(`/api/history?page=${galleryPage}&page_size=${galleryPageSize}&source=${source}`);
+                if (!res.ok) throw new Error("获取画廊数据失败");
+                const data = await res.json();
+                galleryTotal = data.total;
+                currentGalleryItems = data.items || [];
+                renderGallery();
+            } catch (e) {
+                console.error("加载画廊异常:", e);
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function formatAspectRatio(w, h, raw) {
+            if (!w || !h) return raw || '--';
+            const map = {
+                '1024x1024': '1:1', '512x512': '1:1',
+                '768x1024': '3:4', '864x1152': '3:4',
+                '768x1360': '9:16', '832x1248': '2:3',
+                '1024x768': '4:3', '1360x768': '16:9',
+                '1248x832': '3:2', '1536x640': '21:9'
+            };
+            const key = `${w}x${h}`;
+            if (map[key]) return map[key];
+            if (raw && !raw.includes(w.toString()) && raw.includes(':')) return raw;
+            const r = w / h;
+            if (Math.abs(r - 1.0) < 0.05) return '1:1';
+            if (Math.abs(r - 16 / 9) < 0.05) return '16:9';
+            if (Math.abs(r - 9 / 16) < 0.05) return '9:16';
+            if (Math.abs(r - 4 / 3) < 0.05) return '4:3';
+            if (Math.abs(r - 3 / 4) < 0.05) return '3:4';
+            if (Math.abs(r - 3 / 2) < 0.05) return '3:2';
+            if (Math.abs(r - 2 / 3) < 0.05) return '2:3';
+            if (Math.abs(r - 21 / 9) < 0.08 || Math.abs(r - 2.4) < 0.05) return '21:9';
+            return `${w}:${h}`;
+        }
+
+        function renderGallery() {
+            const grid = document.getElementById('gallery-grid');
+            const emptyBox = document.getElementById('gallery-empty-box');
+            const statsText = document.getElementById('gallery-stats-text');
+            const prevBtn = document.getElementById('gallery-prev-btn');
+            const nextBtn = document.getElementById('gallery-next-btn');
+            const pageInfo = document.getElementById('gallery-page-info');
+
+            statsText.innerText = `共 ${galleryTotal} 张生成记录`;
+            const totalPages = Math.max(1, Math.ceil(galleryTotal / galleryPageSize));
+            pageInfo.innerText = `第 ${galleryPage} / ${totalPages} 页`;
+            prevBtn.disabled = galleryPage <= 1;
+            nextBtn.disabled = galleryPage >= totalPages;
+
+            if (!currentGalleryItems || currentGalleryItems.length === 0) {
+                grid.innerHTML = '';
+                emptyBox.style.display = 'block';
+                return;
+            }
+            emptyBox.style.display = 'none';
+
+            grid.innerHTML = currentGalleryItems.map((item, idx) => {
+                const sourceLabel = item.source === 'web' ? 'Web 页面' : item.source === 'api_dalle' ? 'DALL-E API' : 'Agent 对话';
+                const sourceClass = item.source === 'web' ? 'source-web' : 'source-api';
+                const costStr = item.duration_seconds ? `${item.duration_seconds}s` : '--';
+                const cfgStr = item.cfg_scale !== undefined ? `CFG ${item.cfg_scale}` : '';
+                const loraBadge = (item.loras && item.loras.length > 0) ? `<span class="gallery-tag" style="color: #c084fc;">🏷️ LoRA x${item.loras.length}</span>` : '';
+                const safePrompt = escapeHtml(item.prompt || '');
+                const timeStr = item.created_time || '';
+                const ratioStr = formatAspectRatio(item.width, item.height, item.aspect_ratio);
+                const modeTag = item.mode === 'inpaint'
+                    ? `<span class="gallery-tag" style="color: #f472b6; border-color: rgba(244,114,182,0.35);">🖌️ 局部重绘(S:${item.strength !== undefined ? item.strength : 0.65})</span>`
+                    : (item.mode === 'img2img'
+                        ? `<span class="gallery-tag" style="color: #60a5fa; border-color: rgba(96,165,250,0.35);">🖼️ 图生图(S:${item.strength !== undefined ? item.strength : 0.65})</span>`
+                        : '');
+
+                return `
+                    <div class="gallery-card">
+                        <div class="gallery-thumb-wrap" onclick="openGalleryDetail(${idx})">
+                            <img src="${item.image_url}" alt="历史图片" loading="lazy">
+                        </div>
+                        <div class="gallery-card-body">
+                            <div class="gallery-meta-tags">
+                                <span class="gallery-tag ${sourceClass}">${sourceLabel}</span>
+                                ${modeTag}
+                                <span class="gallery-tag">⚡ ${item.steps}步</span>
+                                <span class="gallery-tag">⏳ ${costStr}</span>
+                                <span class="gallery-tag">📐 ${ratioStr}</span>
+                                ${cfgStr ? `<span class="gallery-tag">${cfgStr}</span>` : ''}
+                                ${loraBadge}
+                            </div>
+                            <div class="gallery-prompt" onclick="openGalleryDetail(${idx})" title="${safePrompt}">${safePrompt}</div>
+                            <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 6px;">📅 ${timeStr}</div>
+                            <div class="gallery-actions">
+                                <button class="btn-coral" onclick="reuseGalleryItem(${idx})">⚡ 复用</button>
+                                <button class="btn-secondary" onclick="sendToImg2Img(${idx})" title="以此图作为底图进行图生图">🔄 垫图</button>
+                                <button class="btn-secondary" onclick="sendToInpaint(${idx})" title="涂抹该图进行局部重绘" style="color: #f472b6;">🖌️ 重绘</button>
+                                <button class="btn-secondary" onclick="copyPromptText('${encodeURIComponent(item.prompt || '')}')">📋 复制</button>
+                                <button class="btn-flush" onclick="deleteGalleryItem('${item.filename}')" style="color: var(--danger-text);">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openGalleryDetail(idx) {
+            const item = currentGalleryItems[idx];
+            if (!item) return;
+            activeDetailItem = item;
+
+            document.getElementById('modal-img').src = item.image_url;
+            document.getElementById('modal-prompt').innerText = item.prompt || '（无提示词）';
+
+            const negRow = document.getElementById('modal-neg-row');
+            if (item.negative_prompt && item.negative_prompt.trim()) {
+                negRow.style.display = 'block';
+                document.getElementById('modal-negative').innerText = item.negative_prompt;
+            } else {
+                negRow.style.display = 'none';
+            }
+
+            const ratioStr = formatAspectRatio(item.width, item.height, item.aspect_ratio);
+            document.getElementById('modal-meta-time').innerText = `📅 ${item.created_time || '--'}`;
+            document.getElementById('modal-meta-size').innerText = `📐 ${item.width || '--'} × ${item.height || '--'} (${ratioStr})`;
+            document.getElementById('modal-meta-duration').innerText = item.duration_seconds ? `⚡ ${item.duration_seconds} 秒` : '⚡ --';
+
+            const sourceEl = document.getElementById('modal-meta-source');
+            if (item.mode === 'inpaint') {
+                sourceEl.innerText = `🖌️ 局部重绘 (重绘幅度: ${item.strength !== undefined ? item.strength : 0.65})`;
+                sourceEl.className = 'gallery-tag';
+                sourceEl.style.color = '#f472b6';
+                sourceEl.style.borderColor = 'rgba(244,114,182,0.4)';
+            } else if (item.mode === 'img2img') {
+                sourceEl.innerText = `🖼️ 图生图 (重绘幅度: ${item.strength !== undefined ? item.strength : 0.65})`;
+                sourceEl.className = 'gallery-tag';
+                sourceEl.style.color = '#60a5fa';
+                sourceEl.style.borderColor = 'rgba(96,165,250,0.4)';
+            } else if (item.source === 'web') {
+                sourceEl.innerText = '🏷️ Web 页面创作';
+                sourceEl.className = 'gallery-tag source-web';
+                sourceEl.style.color = '';
+                sourceEl.style.borderColor = '';
+            } else if (item.source === 'api_dalle') {
+                sourceEl.innerText = '🏷️ OpenAI DALL-E API';
+                sourceEl.className = 'gallery-tag source-api';
+                sourceEl.style.color = '';
+                sourceEl.style.borderColor = '';
+            } else {
+                sourceEl.innerText = '🏷️ Agent 对话流 API';
+                sourceEl.className = 'gallery-tag source-api';
+                sourceEl.style.color = '';
+                sourceEl.style.borderColor = '';
+            }
+
+            document.getElementById('modal-steps').innerText = `${item.steps} 步`;
+            document.getElementById('modal-cfg').innerText = item.cfg_scale !== undefined ? item.cfg_scale : 1.0;
+            document.getElementById('modal-seed').innerText = item.seed;
+            document.getElementById('modal-vram-mode').innerText = item.vram_mode || '--';
+
+            const modelDisplay = `扩散: ${item.diff_model || '--'}\n文本: ${item.te_model || '--'}\nVAE: ${item.vae_model || '--'}`;
+            document.getElementById('modal-models').innerText = modelDisplay;
+
+            const loraRow = document.getElementById('modal-lora-row');
+            const lorasWrap = document.getElementById('modal-loras');
+            if (item.loras && item.loras.length > 0) {
+                loraRow.style.display = 'block';
+                lorasWrap.innerHTML = item.loras.map(l => `<span class="lora-badge">🏷️ ${l.name} (${l.weight})</span>`).join('');
+            } else {
+                loraRow.style.display = 'none';
+            }
+
+            document.getElementById('modal-dl-btn').href = item.image_url;
+            document.getElementById('modal-dl-btn').setAttribute('download', item.filename);
+
+            document.getElementById('modal-img-wrap').onclick = () => {
+                openFullscreenViewer(item);
+            };
+
+            document.getElementById('gallery-modal').classList.add('active');
+        }
+
+        // 全屏沉浸式原图查看器逻辑
+        function openFullscreenViewer(item) {
+            const fs = document.getElementById('fullscreen-viewer');
+            const fsImg = document.getElementById('fs-viewer-img');
+            const fsTitle = document.getElementById('fs-viewer-title');
+            const ratioStr = formatAspectRatio(item.width, item.height, item.aspect_ratio);
+            fsTitle.innerText = `原图档案：${item.width} × ${item.height} (${ratioStr}) - ${item.filename}`;
+            fsImg.src = item.image_url;
+            fsImg.className = 'fit-screen';
+            fs.classList.add('active');
+        }
+
+        function closeFullscreenViewer() {
+            const fs = document.getElementById('fullscreen-viewer');
+            if (fs) fs.classList.remove('active');
+        }
+
+        function toggleFullscreenZoom() {
+            const fsImg = document.getElementById('fs-viewer-img');
+            if (!fsImg) return;
+            if (fsImg.classList.contains('fit-screen')) {
+                fsImg.className = 'actual-size';
+            } else {
+                fsImg.className = 'fit-screen';
+            }
+        }
+
+        document.getElementById('fs-close-btn').addEventListener('click', closeFullscreenViewer);
+        document.getElementById('fs-zoom-toggle-btn').addEventListener('click', toggleFullscreenZoom);
+        document.getElementById('fs-viewer-img').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFullscreenZoom();
+        });
+        document.getElementById('fs-viewport').addEventListener('click', (e) => {
+            if (e.target.id === 'fs-viewport') {
+                closeFullscreenViewer();
+            }
+        });
+
+        // 全局 ESC 键监听
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const fs = document.getElementById('fullscreen-viewer');
+                if (fs && fs.classList.contains('active')) {
+                    closeFullscreenViewer();
+                    return;
+                }
+                const inpaintModal = document.getElementById('inpaint-modal');
+                if (inpaintModal && inpaintModal.classList.contains('active')) {
+                    closeInpaintModal();
+                    return;
+                }
+                const modal = document.getElementById('gallery-modal');
+                if (modal && modal.classList.contains('active')) {
+                    modal.classList.remove('active');
+                }
+            }
+        });
+
+        document.getElementById('modal-detail-close-btn').addEventListener('click', () => {
+            document.getElementById('gallery-modal').classList.remove('active');
+        });
+
+        document.getElementById('gallery-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'gallery-modal') {
+                document.getElementById('gallery-modal').classList.remove('active');
+            }
+        });
+
+        function copyPromptText(encodedPrompt) {
+            const text = decodeURIComponent(encodedPrompt);
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert("提示词已成功复制到剪贴板！", "复制成功");
+            }).catch(() => {
+                showAlert(text, "提示词内容");
+            });
+        }
+
+        document.getElementById('modal-copy-btn').addEventListener('click', () => {
+            if (activeDetailItem) {
+                copyPromptText(encodeURIComponent(activeDetailItem.prompt || ''));
+            }
+        });
+
+        document.getElementById('modal-reuse-btn').addEventListener('click', () => {
+            if (activeDetailItem) {
+                reuseGalleryItemDirect(activeDetailItem);
+                document.getElementById('gallery-modal').classList.remove('active');
+            }
+        });
+
+        function reuseGalleryItem(idx) {
+            const item = currentGalleryItems[idx];
+            if (item) reuseGalleryItemDirect(item);
+        }
+
+        function reuseGalleryItemDirect(item) {
+            document.getElementById('prompt-input').value = item.prompt || '';
+
+            if (item.width && item.height) {
+                currentW = item.width;
+                currentH = item.height;
+                document.querySelectorAll('.preset-pill').forEach(pill => {
+                    if (parseInt(pill.dataset.w) === currentW && parseInt(pill.dataset.h) === currentH) {
+                        pill.classList.add('active');
+                    } else {
+                        pill.classList.remove('active');
+                    }
+                });
+            }
+
+            if (item.steps) document.getElementById('steps-input').value = item.steps;
+            if (item.seed !== undefined) document.getElementById('seed-input').value = item.seed;
+
+            const negInput = document.getElementById('negative-prompt-input');
+            const cfgInput = document.getElementById('cfg-input');
+            const cfgValText = document.getElementById('cfg-val-text');
+            const advDrawer = document.getElementById('advanced-params-drawer');
+
+            let hasAdvanced = false;
+            if (item.negative_prompt) {
+                negInput.value = item.negative_prompt;
+                hasAdvanced = true;
+            } else {
+                negInput.value = '';
+            }
+
+            if (item.cfg_scale !== undefined && item.cfg_scale !== null) {
+                cfgInput.value = item.cfg_scale;
+                cfgValText.innerText = parseFloat(item.cfg_scale).toFixed(1);
+                if (parseFloat(item.cfg_scale) !== 1.0) hasAdvanced = true;
+            } else {
+                cfgInput.value = 1.0;
+                cfgValText.innerText = "1.0";
+            }
+
+            if (item.loras && item.loras.length > 0) {
+                currentLoRAs = JSON.parse(JSON.stringify(item.loras));
+                renderLoRATags();
+                hasAdvanced = true;
+            } else {
+                currentLoRAs = [];
+                renderLoRATags();
+            }
+
+            if (hasAdvanced) {
+                advDrawer.open = true;
+            }
+
+            if (item.diff_model) {
+                const diffSel = document.getElementById('diff-select');
+                for (let opt of diffSel.options) {
+                    if (opt.value === item.diff_model) {
+                        diffSel.value = item.diff_model;
+                        break;
+                    }
+                }
+            }
+
+            switchTab('create');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showAlert("已成功将历史参数回填至创作表单，可直接微调或点击生成！", "参数已就绪");
+        }
+
+        // ==============================================================================
+        // 图生图 (img2img) 垫图交互核心逻辑
+        // ==============================================================================
+        let currentInitImage = null;
+        let initImageNaturalW = 0;
+        let initImageNaturalH = 0;
+
+        function setInitImage(src, natW = 0, natH = 0) {
+            if (!src) {
+                clearInitImage();
+                return;
+            }
+            if (currentInitImage !== src) {
+                clearMask();
+            }
+            currentInitImage = src;
+            const imgEl = document.getElementById('init-img-preview');
+            imgEl.src = src;
+
+            document.getElementById('init-img-dropzone').style.display = 'none';
+            document.getElementById('init-img-preview-box').style.display = 'flex';
+            document.getElementById('clear-init-img-btn').style.display = 'inline-block';
+
+            if (natW && natH) {
+                initImageNaturalW = natW;
+                initImageNaturalH = natH;
+                document.getElementById('init-img-size-badge').innerText = `${natW}x${natH}`;
+            } else {
+                imgEl.onload = () => {
+                    initImageNaturalW = imgEl.naturalWidth;
+                    initImageNaturalH = imgEl.naturalHeight;
+                    document.getElementById('init-img-size-badge').innerText = `${initImageNaturalW}x${initImageNaturalH}`;
+                };
+            }
+        }
+
+        function clearInitImage() {
+            currentInitImage = null;
+            initImageNaturalW = 0;
+            initImageNaturalH = 0;
+            clearMask();
+            document.getElementById('init-img-preview').src = '';
+            document.getElementById('init-img-dropzone').style.display = 'block';
+            document.getElementById('init-img-preview-box').style.display = 'none';
+            document.getElementById('clear-init-img-btn').style.display = 'none';
+            document.getElementById('init-img-file-input').value = '';
+        }
+
+        function handleImageFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const tempImg = new Image();
+                tempImg.onload = () => {
+                    const maxDim = 1536;
+                    let w = tempImg.naturalWidth;
+                    let h = tempImg.naturalHeight;
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) {
+                            h = Math.round((h * maxDim) / w);
+                            w = maxDim;
+                        } else {
+                            w = Math.round((w * maxDim) / h);
+                            h = maxDim;
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(tempImg, 0, 0, w, h);
+                        setInitImage(canvas.toDataURL('image/png'), w, h);
+                    } else {
+                        setInitImage(e.target.result, w, h);
+                    }
+                };
+                tempImg.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        const dropzone = document.getElementById('init-img-dropzone');
+        const fileInput = document.getElementById('init-img-file-input');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) handleImageFile(e.target.files[0]);
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleImageFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        document.getElementById('clear-init-img-btn').addEventListener('click', clearInitImage);
+
+        document.getElementById('strength-input').addEventListener('input', (e) => {
+            document.getElementById('strength-val-text').innerText = parseFloat(e.target.value).toFixed(2);
+        });
+
+        document.getElementById('apply-init-size-btn').addEventListener('click', () => {
+            if (!initImageNaturalW || !initImageNaturalH) return;
+            const targetRatio = initImageNaturalW / initImageNaturalH;
+            let closestPill = null;
+            let minDiff = 999;
+            document.querySelectorAll('.preset-pill').forEach(pill => {
+                const pw = parseInt(pill.dataset.w);
+                const ph = parseInt(pill.dataset.h);
+                const pRatio = pw / ph;
+                const diff = Math.abs(pRatio - targetRatio);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestPill = pill;
+                }
+            });
+            if (closestPill) {
+                closestPill.click();
+                showAlert(`已自动匹配并切换至最贴近底图比例的规格：${closestPill.innerText}`, "规格已同步");
+            }
+        });
+
+        // 剪贴板全局 Ctrl+V 粘贴直接垫图
+        window.addEventListener('paste', (e) => {
+            if (e.clipboardData && e.clipboardData.items) {
+                for (let item of e.clipboardData.items) {
+                    if (item.type.indexOf('image') !== -1) {
+                        const blob = item.getAsFile();
+                        handleImageFile(blob);
+                        switchTab('create');
+                        showAlert("已自动将剪贴板中的截图载入为图生图参考底图！", "垫图成功");
+                        break;
+                    }
+                }
+            }
+        });
+
+        // 从画廊直接发送到图生图
+        function sendToImg2Img(idx) {
+            const item = currentGalleryItems[idx];
+            if (item) sendToImg2ImgDirect(item);
+        }
+
+        function sendToImg2ImgDirect(item) {
+            setInitImage(item.image_url, item.width, item.height);
+            if (item.prompt && !document.getElementById('prompt-input').value.trim()) {
+                document.getElementById('prompt-input').value = item.prompt;
+            }
+            switchTab('create');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showAlert("已成功将该历史图片载入为图生图底图！可输入新提示词或调节重绘幅度生成。", "底图就绪");
+        }
+
+        document.getElementById('modal-img2img-btn').addEventListener('click', () => {
+            if (activeDetailItem) {
+                sendToImg2ImgDirect(activeDetailItem);
+                document.getElementById('gallery-modal').classList.remove('active');
+            }
+        });
+
+        // ==============================================================================
+        // 局部重绘 (Inpainting) 蒙版涂抹工作台核心逻辑
+        // ==============================================================================
+        let currentMaskBase64 = null;
+        let inpaintBrushMode = 'brush';
+        let inpaintBrushSize = 40;
+        let isPainting = false;
+
+        const inpaintModal = document.getElementById('inpaint-modal');
+        const inpaintBgImg = document.getElementById('inpaint-bg-img');
+        const maskCanvas = document.getElementById('inpaint-mask-canvas');
+        const maskCtx = maskCanvas ? maskCanvas.getContext('2d') : null;
+
+        function clearMask() {
+            currentMaskBase64 = null;
+            if (maskCanvas && maskCtx) {
+                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+            }
+            const badge = document.getElementById('mask-status-badge');
+            if (badge) badge.style.display = 'none';
+            const openBtn = document.getElementById('open-inpaint-btn');
+            if (openBtn) openBtn.innerText = "🖌️ 涂抹局部重绘区域 (Inpaint)";
+        }
+
+        document.getElementById('clear-mask-btn')?.addEventListener('click', () => {
+            clearMask();
+            showAlert("已移除局部重绘蒙版，当前为整图图生图模式。", "蒙版已移除");
+        });
+
+        function syncInpaintCanvas() {
+            if (!inpaintBgImg || !maskCanvas) return;
+            const natW = inpaintBgImg.naturalWidth || initImageNaturalW || 1024;
+            const natH = inpaintBgImg.naturalHeight || initImageNaturalH || 1024;
+            if (maskCanvas.width !== natW || maskCanvas.height !== natH) {
+                maskCanvas.width = natW;
+                maskCanvas.height = natH;
+            }
+        }
+
+        function openInpaintModal() {
+            if (!currentInitImage) {
+                showAlert("请先上传或选择图生图底图，再进行局部重绘涂抹！", "提示");
+                return;
+            }
+            if (inpaintBgImg.src !== currentInitImage) {
+                inpaintBgImg.onload = () => {
+                    syncInpaintCanvas();
+                };
+                inpaintBgImg.src = currentInitImage;
+            } else {
+                syncInpaintCanvas();
+            }
+            inpaintModal.classList.add('active');
+        }
+
+        function closeInpaintModal() {
+            if (inpaintModal) inpaintModal.classList.remove('active');
+        }
+
+        document.getElementById('open-inpaint-btn')?.addEventListener('click', openInpaintModal);
+        document.getElementById('inpaint-close-btn')?.addEventListener('click', closeInpaintModal);
+        inpaintModal?.addEventListener('click', (e) => {
+            if (e.target.id === 'inpaint-modal') closeInpaintModal();
+        });
+
+        const toolBrushBtn = document.getElementById('tool-brush-btn');
+        const toolEraserBtn = document.getElementById('tool-eraser-btn');
+
+        toolBrushBtn?.addEventListener('click', () => {
+            inpaintBrushMode = 'brush';
+            toolBrushBtn.classList.add('active');
+            toolEraserBtn.classList.remove('active');
+        });
+
+        toolEraserBtn?.addEventListener('click', () => {
+            inpaintBrushMode = 'eraser';
+            toolEraserBtn.classList.add('active');
+            toolBrushBtn.classList.remove('active');
+        });
+
+        const brushSizeInput = document.getElementById('brush-size-input');
+        const brushSizeText = document.getElementById('brush-size-text');
+        brushSizeInput?.addEventListener('input', (e) => {
+            inpaintBrushSize = parseInt(e.target.value) || 40;
+            if (brushSizeText) brushSizeText.innerText = `${inpaintBrushSize}px`;
+        });
+
+        document.getElementById('tool-clear-btn')?.addEventListener('click', () => {
+            if (maskCanvas && maskCtx) {
+                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+            }
+        });
+
+        function getCanvasPos(e) {
+            const rect = maskCanvas.getBoundingClientRect();
+            const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+            const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+            const scaleX = maskCanvas.width / (rect.width || 1);
+            const scaleY = maskCanvas.height / (rect.height || 1);
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY,
+                scaleRatio: scaleX
+            };
+        }
+
+        function drawStrokeStart(e) {
+            if (!maskCtx) return;
+            isPainting = true;
+            const pos = getCanvasPos(e);
+            const r = (inpaintBrushSize * pos.scaleRatio) / 2;
+            maskCtx.lineCap = 'round';
+            maskCtx.lineJoin = 'round';
+            maskCtx.lineWidth = inpaintBrushSize * pos.scaleRatio;
+
+            if (inpaintBrushMode === 'eraser') {
+                maskCtx.globalCompositeOperation = 'destination-out';
+                maskCtx.strokeStyle = 'rgba(0,0,0,1)';
+                maskCtx.fillStyle = 'rgba(0,0,0,1)';
+            } else {
+                maskCtx.globalCompositeOperation = 'source-over';
+                maskCtx.strokeStyle = 'rgba(244, 114, 182, 0.65)';
+                maskCtx.fillStyle = 'rgba(244, 114, 182, 0.65)';
+            }
+
+            maskCtx.beginPath();
+            maskCtx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+            maskCtx.fill();
+            maskCtx.beginPath();
+            maskCtx.moveTo(pos.x, pos.y);
+        }
+
+        function drawStrokeMove(e) {
+            if (!isPainting || !maskCtx) return;
+            const pos = getCanvasPos(e);
+            maskCtx.lineWidth = inpaintBrushSize * pos.scaleRatio;
+            maskCtx.lineTo(pos.x, pos.y);
+            maskCtx.stroke();
+            maskCtx.beginPath();
+            maskCtx.moveTo(pos.x, pos.y);
+        }
+
+        function drawStrokeEnd() {
+            if (!isPainting) return;
+            isPainting = false;
+            if (maskCtx) maskCtx.beginPath();
+        }
+
+        if (maskCanvas) {
+            maskCanvas.addEventListener('mousedown', (e) => {
+                drawStrokeStart(e);
+            });
+            maskCanvas.addEventListener('mousemove', (e) => {
+                drawStrokeMove(e);
+            });
+            maskCanvas.addEventListener('mouseup', drawStrokeEnd);
+            maskCanvas.addEventListener('mouseleave', drawStrokeEnd);
+
+            maskCanvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                drawStrokeStart(e);
+            }, { passive: false });
+            maskCanvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                drawStrokeMove(e);
+            }, { passive: false });
+            maskCanvas.addEventListener('touchend', drawStrokeEnd);
+            maskCanvas.addEventListener('touchcancel', drawStrokeEnd);
+        }
+
+        document.getElementById('inpaint-apply-btn')?.addEventListener('click', () => {
+            if (!maskCanvas || !maskCtx || !maskCanvas.width || !maskCanvas.height) {
+                showAlert("画布尚未准备好，请稍候再试。", "提示");
+                return;
+            }
+
+            const imgData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+            const data = imgData.data;
+            let hasPainted = false;
+            for (let i = 3; i < data.length; i += 4) {
+                if (data[i] > 15) {
+                    hasPainted = true;
+                    break;
+                }
+            }
+
+            if (!hasPainted) {
+                showAlert("您尚未在图片上涂抹任何重绘区域！请使用画笔涂抹后再点击完成。", "提示");
+                return;
+            }
+
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = maskCanvas.width;
+            offCanvas.height = maskCanvas.height;
+            const offCtx = offCanvas.getContext('2d');
+            const outData = offCtx.createImageData(maskCanvas.width, maskCanvas.height);
+            const out = outData.data;
+            const isInverted = document.getElementById('mask-invert-check')?.checked || false;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const painted = data[i + 3] > 15;
+                const val = isInverted ? (painted ? 0 : 255) : (painted ? 255 : 0);
+                out[i] = val;
+                out[i + 1] = val;
+                out[i + 2] = val;
+                out[i + 3] = 255;
+            }
+            offCtx.putImageData(outData, 0, 0);
+
+            currentMaskBase64 = offCanvas.toDataURL('image/png');
+            closeInpaintModal();
+
+            const badge = document.getElementById('mask-status-badge');
+            if (badge) badge.style.display = 'inline-flex';
+            const openBtn = document.getElementById('open-inpaint-btn');
+            if (openBtn) openBtn.innerText = "🖌️ 修改局部重绘蒙版 (已就绪)";
+            showAlert("局部重绘蒙版已生成就绪！系统将在生成时只重绘涂抹选中的区域。", "蒙版已应用");
+        });
+
+        function sendToInpaint(idx) {
+            const item = currentGalleryItems[idx];
+            if (item) sendToInpaintDirect(item);
+        }
+
+        function sendToInpaintDirect(item) {
+            setInitImage(item.image_url, item.width, item.height);
+            if (item.prompt && !document.getElementById('prompt-input').value.trim()) {
+                document.getElementById('prompt-input').value = item.prompt;
+            }
+            switchTab('create');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => {
+                openInpaintModal();
+            }, 160);
+        }
+
+        document.getElementById('modal-inpaint-btn')?.addEventListener('click', () => {
+            if (activeDetailItem) {
+                sendToInpaintDirect(activeDetailItem);
+                document.getElementById('gallery-modal').classList.remove('active');
+            }
+        });
+
+        async function deleteGalleryItem(filename) {
+            const ok = await showConfirm(`确定要彻底删除该图片档案吗？\n将同步删除磁盘图片文件及伴生元数据。`, "确认删除");
+            if (!ok) return;
+
+            try {
+                const res = await fetch(`/api/history/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    fetchGallery(galleryPage);
+                } else {
+                    showAlert("删除失败", "错误");
+                }
+            } catch (e) {
+                showAlert(`删除出错: ${e.message}`, "错误");
+            }
+        }
+
+        document.getElementById('gallery-refresh-btn').addEventListener('click', () => fetchGallery(1));
+        document.getElementById('gallery-source-filter').addEventListener('change', () => fetchGallery(1));
+        document.getElementById('gallery-prev-btn').addEventListener('click', () => {
+            if (galleryPage > 1) fetchGallery(galleryPage - 1);
+        });
+        document.getElementById('gallery-next-btn').addEventListener('click', () => {
+            fetchGallery(galleryPage + 1);
         });
 
         // 页面初始化

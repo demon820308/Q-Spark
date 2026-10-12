@@ -51,18 +51,21 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: Q-Spark ${{ steps.release_info.outputs.tag }} - Windows x64 Portable
           body: |
-            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 绿色独立便携版首发
+            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 全能创作工作台与全功能历史画廊 2.0
 
             基于 `stable-diffusion.cpp` C++ 原生引擎构建的轻量、极速本地生图工作室，内置兼容 OpenAI 的 Agent 生图接口。
 
+            ### 🚀 v0.2.1 重磅升级 (Highlights)
+            - **🎨 单一工作台三态合一**：在同一页面流畅完成文生图 (txt2img)、图生图 (img2img) 与图像编辑/局部重绘 (Inpainting)。
+            - **🖌️ 原生 Canvas 局部重绘工作台**：内置轻量无依赖涂抹工作台，画笔/橡皮擦、粗细滑块调节、一键清空与“反转蒙版”选项，导出 1:1 黑白二值 PNG 蒙版（纯黑保留，纯白重绘）。
+            - **🏷️ 多 LoRA 动态挂载机制**：支持动态扫描并同时挂载多个 LoRA，独立调节权重（0.1~2.0）。
+            - **🖼️ 沉浸式历史画廊 2.0**：伴生 Sidecar JSON 完整记录元数据，一键“⚡ 参数重绘 / 复用”、“🔄 垫图”、“🖌️ 局部重绘”，支持方案 A 全屏 1:1 / 适应屏幕大图查看器。
+            - **🧠 硬件监控与显存管理**：毫秒级显存/内存/CPU监控，支持即用即走（On-Demand 闲置 0MB）、智能休眠与常驻模式。
+
             ### 📦 便携版特性 (Portable Highlights)
             - **零依赖开箱即用**：内置轻量独立 Python 3.12 绿色运行时与所有依赖，无需在系统中另外安装 Python！
-            - **完整 CUDA 加速推理**：内置完整 CUDA 12 引擎 (`sd-cli.exe`, `ggml-cuda.dll`, `cublasLt64_12.dll` 等)。
-            - **原生启动器**：内置 `Q-Spark.exe`，带专属量子闪电图标，解压后双击直接起飞！
-            - **支持模型**：
-              - Qwen-Image-2.1-Turbo (Uncensored GGUF / Viggle 6-Step INT8)
-              - Z-Image Turbo (8~9-Step S3-DiT)
-            - **Agent 生态对接**：无缝连接 Dify、Cherry Studio、Chatbox 等 AI 智能体工作流。
+            - **完整 CUDA 12 加速推理**：内置完整 CUDA 12 引擎 (`sd-cli.exe`, `ggml-cuda.dll`, `cublasLt64_12.dll` 等)。
+            - **原生启动器**：内置 `Q-Spark.exe`，解压后双击直接起飞！
 
             ### 🚀 快速上手 (Quick Start)
             1. 下载下方的 `Q-Spark-${{ steps.release_info.outputs.version }}-windows-x64-portable.zip` 并解压；

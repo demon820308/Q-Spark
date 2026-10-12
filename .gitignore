@@ -41,3 +41,5 @@ ENV/
 *.lnk
 *.bak
 python-embed.zip
+inputs/
+graphify-out/
