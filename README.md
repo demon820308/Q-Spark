@@ -3,7 +3,7 @@
   <h1>Q-Spark Studio</h1>
   <p><strong>High-performance, lightweight local AI image generation studio powered by stable-diffusion.cpp with OpenAI-compatible Agent API.</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.1</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.2</a> ·
     <a href="#key-features">Key Features</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#models-catalog">Models Catalog</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=Release" alt="Latest Release" /></a>
-    <img src="https://img.shields.io/badge/Version-v0.2.1-green" alt="Version v0.2.1" />
+    <img src="https://img.shields.io/badge/Version-v0.2.2-green" alt="Version v0.2.2" />
     <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/Engine-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ Engine" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,7 +31,7 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 ---
 
-## 🌟 Key Features in v0.2.1
+## 🌟 Key Features in v0.2.2
 
 ### 1. 🎨 All-in-One Creative Workbench (Mode-Isolated Studio)
 - **Text-to-Image (txt2img)**: Pure text-driven generation with model-aware step adaptation, random seed locking, and CFG scale control.
@@ -58,6 +58,10 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
   - **On-Demand**: 0MB idle VRAM footprint (recommended for 8~10GB GPUs).
   - **Auto-Unload**: Automatically unloads models after 5 minutes of inactivity.
   - **Always-On**: Keeps models resident in VRAM for instant second-level responses.
+
+### 5. 🤖 Universal AI Agent Skill Ecosystem & Dynamic Pipeline
+- **Universal Agent Support**: Built-in standard `skills/qspark` skill bundle and CLI execution script compatible with all AI Agents (Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code, AutoGen, custom Python agents, etc.).
+- **Single Source of Truth (Zero Hardcoding)**: All APIs (`/v1/models`, `/v1/chat/completions`) and the skill are 100% dynamically driven by `config.json`, automatically matching Z-Image or Qwen architecture components.
 
 ---
 
@@ -192,6 +196,57 @@ In your agent platform settings:
 4. Model Name: `q-spark` (or leave default)
 
 ---
+
+## 🧩 Universal AI Agent Skill Ecosystem (All-Agents Guide)
+
+Q-Spark includes a standard image generation skill designed for **ANY AI Agent, coding assistant, or agent framework**:
+
+* **Skill Directory**: [`skills/qspark/`](skills/qspark/) (contains `SKILL.md` capability manual & portable script `scripts/generate.py`)
+* **Workspace Spec Directory**: [`.agents/skills/qspark/`](.agents/skills/qspark/)
+
+### Why Use the Skill Pattern?
+1. **Retain Reasoning LLM**: No need to swap your agent's reasoning model to an image generator; your agent continues using Claude 3.5 Sonnet, GPT-4o, or Gemini for high-level logic, calling Q-Spark only when artwork is needed.
+2. **Single Source of Truth**: Active models and parameters dynamically follow `config.json` without hardcoded model strings.
+3. **Zero Extra Dependencies**: `generate.py` is written in pure Python standard library, executable by any terminal-enabled agent in 1 second.
+4. **Auto-Rendered Feedback**: Returns the local image path and clickable Markdown preview link `![image](file:///...)` directly into the chat stream.
+
+---
+
+### Integration Guide for Different Agent Types
+
+#### 1. Terminal & Coding Agents (Claude Code, Cursor, Windsurf, Antigravity, Roo Code, Aider)
+- **Direct CLI Invocation**: Instruct your agent to read [`skills/qspark/SKILL.md`](skills/qspark/SKILL.md). When generation is requested, the agent runs:
+  ```powershell
+  python "skills/qspark/scripts/generate.py" --prompt "cyberpunk cat, 8k resolution" --size "1360x768"
+  ```
+- **Workspace Auto-Discovery**: In Antigravity or workspace-aware environments, `.agents/skills/qspark` is detected automatically without setup.
+- **Global Installation (Machine-Wide across all projects)**:
+  * **Windows**:
+    ```powershell
+    Copy-Item -Path "skills\qspark" -Destination "$env:USERPROFILE\.gemini\config\skills\qspark" -Recurse -Force
+    ```
+  * **Linux / macOS**:
+    ```bash
+    cp -r skills/qspark ~/.gemini/config/skills/qspark
+    ```
+
+#### 2. Python Agent Frameworks (LangChain, AutoGen, CrewAI, LlamaIndex)
+Wrap `generate.py` as a native Tool / Function Call:
+```python
+import subprocess
+
+def qspark_image_tool(prompt: str, size: str = "1024x1024") -> str:
+    """Generate image via local Q-Spark engine and return file path."""
+    cmd = ["python", "skills/qspark/scripts/generate.py", "--prompt", prompt, "--size", size]
+    return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+```
+
+#### 3. Platform & Workflow Agents (Dify, FastGPT, Coze, Cherry Studio, Chatbox)
+For HTTP-driven agent platforms, configure via OpenAI-compatible API:
+* **Protocol**: OpenAI Compatible
+* **Base URL**: `http://127.0.0.1:40188/v1`
+* **API Key**: `sk-any`
+* **Endpoints**: `POST /v1/images/generations` or `POST /v1/chat/completions`
 
 ## 🛠️ Tech Stack & Acknowledgements
 

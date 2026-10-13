@@ -599,9 +599,31 @@ class InferenceEngine:
                 seed = random.randint(1, 2**31 - 1)
 
             diff_list, te_list, vae_list, lora_list = scan_models()
-            diff_model = diff_model or APP_CONFIG.get("api_diff_model") or diff_list[0]
-            te_model = te_model or APP_CONFIG.get("api_te_model") or te_list[0]
-            vae_model = vae_model or APP_CONFIG.get("api_vae_model") or vae_list[0]
+            diff_model = diff_model or APP_CONFIG.get("api_diff_model") or (diff_list[0] if diff_list else "")
+            te_model = te_model or APP_CONFIG.get("api_te_model") or (te_list[0] if te_list else "")
+            vae_model = vae_model or APP_CONFIG.get("api_vae_model") or (vae_list[0] if vae_list else "")
+
+            # 智能架构自适应成套匹配 (防止用户修改主模型时因 TE/VAE 不匹配报错)
+            if "z_image" in (diff_model or "").lower():
+                if not te_model or "qwen3vl" in te_model.lower() or "qwen-image" in te_model.lower():
+                    cand_te = next((t for t in te_list if "qwen_3_4b" in t.lower() and "fixed" in t.lower()), None)
+                    if not cand_te:
+                        cand_te = next((t for t in te_list if "qwen_3_4b" in t.lower()), None)
+                    if cand_te:
+                        te_model = cand_te
+                if not vae_model or "qwen" in vae_model.lower():
+                    cand_vae = next((v for v in vae_list if v.lower() == "ae.safetensors" or "flux" in v.lower()), None)
+                    if cand_vae:
+                        vae_model = cand_vae
+            elif "qwen" in (diff_model or "").lower():
+                if not te_model or "qwen_3_4b" in te_model.lower():
+                    cand_te = next((t for t in te_list if "qwen3vl" in t.lower() or "qwen-image" in t.lower()), None)
+                    if cand_te:
+                        te_model = cand_te
+                if not vae_model or "ae." in vae_model.lower() or "flux" in vae_model.lower():
+                    cand_vae = next((v for v in vae_list if "qwen" in v.lower()), None)
+                    if cand_vae:
+                        vae_model = cand_vae
 
             if steps is None or int(steps) <= 0:
                 steps = APP_CONFIG.get("api_steps") or get_model_default_steps(diff_model)

@@ -3,7 +3,7 @@
   <h1>Q-Spark 生图控制台</h1>
   <p><strong>基于 stable-diffusion.cpp C++ 原生引擎的轻量高性能本地 AI 生图工作室，支持兼容 OpenAI 的 Agent API。</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.1</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.2</a> ·
     <a href="#核心功能特性">核心特性</a> ·
     <a href="#快速上手">快速上手</a> ·
     <a href="#模型库与目录规范">模型库指引</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=%E7%89%88%E6%9C%AC" alt="最新版本" /></a>
-    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.1-green" alt="版本 v0.2.1" />
+    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.2-green" alt="版本 v0.2.2" />
     <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/%E5%BA%95%E5%B1%82%E5%BC%95%E6%93%8E-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ 引擎" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/%E5%BC%80%E6%BA%90%E5%8D%8F%E8%AE%AE-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,7 +31,7 @@
 
 ---
 
-## 🌟 v0.2.1 核心功能特性
+## 🌟 v0.2.2 核心功能特性
 
 ### 1. 🎨 创作工作台多模态进阶（模式隔离，智能流转）
 - **文生图 (txt2img)**：零底图纯文本极速出图，模型特征步数自适应，支持采样步数、随机种子、CFG 细致调节。
@@ -57,6 +57,10 @@
   - **即用即走（On-Demand）**：冷启动生成，任务结束显存 0MB 闲置占用（8~10GB 显卡强烈推荐）；
   - **智能休眠（Auto-Unload）**：5 分钟闲置自动卸载显存（需 16GB+ 显存）；
   - **显存常驻（Always-On）**：后台常驻模型，秒级响应（需 16GB+ 显存）。
+
+### 5. 🤖 全能 AI Agent 技能生态与全动态模型管线
+- **全智能体通用 Skill 支持**：内置标准化 `skills/qspark` 技能包与调用脚本，兼容所有主流 AI Agent（Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code, AutoGen, 自定义 Python 智能体等），使任何 Agent 均可作为画笔工具随调随走。
+- **单一可信源 (Zero Hardcoding)**：所有 API（`/v1/models`、`/v1/chat/completions` 与 Skill）完全由 `config.json` 动态统一驱动，彻底消除硬编码，自动成套自适应 Z-Image / Qwen-Image 架构。
 
 ---
 
@@ -190,6 +194,61 @@ print("生成图片地址:", resp["data"][0]["url"])
 4. **模型名称**：`q-spark`（或默认）
 
 ---
+
+## 🧩 通用 AI Agent 技能生态（所有智能体通用指南）
+
+Q-Spark 内置了**面向所有 AI Agent / 智能体 / 编码助手**的标准生图技能生态：
+
+* **核心技能包目录**：[`skills/qspark/`](skills/qspark/)（包含通用能力说明书 `SKILL.md` 与跨平台执行脚本 `scripts/generate.py`）
+* **项目工作区内嵌**：[`.agents/skills/qspark/`](.agents/skills/qspark/)
+
+### 为什么所有 Agent 都推荐使用此 Skill？
+1. **保留大模型思考大脑**：不用把 Agent 的主模型硬切为生图模型，Agent 依然使用 Claude、GPT-4o、Gemini 等强推理大模型写代码、拆解任务，仅在需要插图时把 Q-Spark 当作画笔工具；
+2. **单一可信源 (Single Source of Truth)**：出图模型完全由本地 `config.json` 动态控制（Z-Image 或 Qwen 自由切换），Agent 绝不硬编码模型名字；
+3. **零额外环境依赖**：`generate.py` 纯 Python 标准库编写，任何具备终端执行环境的 Agent 均可 1 秒调起；
+4. **全自动闭环输出**：出图后自动返回图片物理路径与 Markdown 格式预览链接 `![image](file:///...)`，无缝嵌入各客户端对话流。
+
+---
+
+### 各类型 Agent 的安装与集成方法
+
+#### 1. 终端与代码型 Agent（Claude Code, Cursor, Windsurf, Antigravity, Roo Code, Aider 等）
+这类 Agent 支持在终端执行命令或读取工作区规则：
+* **免安装直接调用**：引导 Agent 读取 [`skills/qspark/SKILL.md`](skills/qspark/SKILL.md)，Agent 在需要生图时直接执行：
+  ```powershell
+  python "skills/qspark/scripts/generate.py" --prompt "赛博朋克风格机甲猫咪，8k超清" --size "1360x768"
+  ```
+* **工作区自动发现**：在克隆或打开本项目时，智能体环境会自动发现 `.agents/skills/qspark`，无需任何配置，直接对 Agent 说：
+  > *“帮我画一张赛博朋克夜景插图，16:9”*
+* **全局安装（跨所有项目随时可用）**：
+  * **Windows**：
+    ```powershell
+    Copy-Item -Path "skills\qspark" -Destination "$env:USERPROFILE\.gemini\config\skills\qspark" -Recurse -Force
+    ```
+  * **Linux / macOS**：
+    ```bash
+    cp -r skills/qspark ~/.gemini/config/skills/qspark
+    ```
+
+#### 2. 自定义 Python 智能体与框架（LangChain, AutoGen, CrewAI, LlamaIndex 等）
+将 `skills/qspark/scripts/generate.py` 包装为工具函数（Tool / Function Call）：
+```python
+import subprocess
+import json
+
+def generate_image_tool(prompt: str, size: str = "1024x1024") -> str:
+    """调用本地 Q-Spark 引擎生成图片并返回本地文件路径"""
+    cmd = ["python", "skills/qspark/scripts/generate.py", "--prompt", prompt, "--size", size]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    return result.stdout  # 包含本地路径与 Markdown 预览
+```
+
+#### 3. 平台型智能体与对话客户端（Dify, FastGPT, Coze, Cherry Studio, Chatbox）
+对于通过标准 HTTP 请求交互的智能体工作流平台：
+* **接口协议**：OpenAI Compatible
+* **Base URL**：`http://127.0.0.1:40188/v1`
+* **API Key**：`sk-any`（填任意字符串）
+* **接口路径**：`POST /v1/images/generations` 或 `POST /v1/chat/completions`
 
 ## 🛠️ 技术底座与致谢
 

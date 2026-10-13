@@ -104,7 +104,7 @@ class OpenAIGenRequest(BaseModel):
 
 class OpenAIChatRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
-    model: Optional[str] = "qwen-image-2.1-turbo"
+    model: Optional[str] = None
     messages: list[dict]
     stream: Optional[bool] = False
 
@@ -348,15 +348,27 @@ async def ui_generate(req: UIGenerateRequest):
 @router.get("/v1/models")
 @router.get("/models")
 async def openai_get_models():
-    """返回符合 OpenAI 规范的模型列表，供 Agent 客户端（如 Cherry Studio）一键自动导入模型"""
-    model_ids = ["qwen-image-2.1-turbo", "dall-e-3"]
+    """返回符合 OpenAI 规范的模型列表，动态反映 config.json 与当前扫描到的模型"""
+    current_model = APP_CONFIG.get("api_diff_model") or ""
+    current_id = Path(current_model).stem if current_model else "q-spark"
+    diff_choices, _, _, _ = scan_models()
+
+    seen = set()
+    model_ids = []
+    candidates = [current_id, current_model, "default", "q-spark"] + diff_choices
+    for m in candidates:
+        if m and m not in seen:
+            seen.add(m)
+            model_ids.append(m)
+
+    now_t = int(time.time())
     return {
         "object": "list",
         "data": [
             {
                 "id": m_id,
                 "object": "model",
-                "created": 1700000000,
+                "created": now_t,
                 "owned_by": "local",
                 "permission": [],
                 "root": m_id,
@@ -437,7 +449,7 @@ async def openai_chat_completions(req: OpenAIChatRequest):
 
     created_t = int(time.time())
     chat_id = f"chatcmpl-{created_t}-{random.randint(1000, 9999)}"
-    model_name = req.model or "qwen-image-2.1-turbo"
+    model_name = req.model or APP_CONFIG.get("api_diff_model") or "q-spark"
 
     if req.stream:
         async def chat_stream_generator():
@@ -564,7 +576,7 @@ async def openai_chat_completions(req: OpenAIChatRequest):
         "id": chat_id,
         "object": "chat.completion",
         "created": created_t,
-        "model": model_name,
+        "model": actual_diff_model or model_name,
         "choices": [
             {
                 "index": 0,

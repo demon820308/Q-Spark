@@ -233,6 +233,13 @@ def build_portable(version: str, output_dir: str):
         shutil.copytree(src_fix, os.path.join(build_dir, "Fix-convert"), dirs_exist_ok=True)
         log("Copied Fix-convert/ directory")
 
+    # 4.3 Copy Skills & Agent Customizations
+    for skill_dir in ["skills", ".agents"]:
+        src_s = os.path.join(root_dir, skill_dir)
+        if os.path.exists(src_s):
+            shutil.copytree(src_s, os.path.join(build_dir, skill_dir), dirs_exist_ok=True)
+            log(f"Copied {skill_dir}/ directory")
+
     # 5. Create empty directories
     for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "models/loras", "outputs", "outputs/json", "inputs"]:
         d = os.path.join(build_dir, sub)
