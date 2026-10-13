@@ -183,10 +183,11 @@ async def get_metrics_api(response: Response):
 @router.get("/api/config")
 async def get_ui_config():
     diff_choices, te_choices, vae_choices, lora_choices, upscale_choices = scan_models()
+    cur_models_dir = APP_CONFIG.get("models_dir", to_rel_or_abs(MODELS_DIR))
     return {
         "config": APP_CONFIG,
-        "models_dir": to_rel_or_abs(MODELS_DIR),
-        "models_dir_history": APP_CONFIG.get("models_dir_history", [to_rel_or_abs(MODELS_DIR)]),
+        "models_dir": cur_models_dir,
+        "models_dir_history": APP_CONFIG.get("models_dir_history", [cur_models_dir]),
         "diff_choices": diff_choices,
         "te_choices": te_choices,
         "vae_choices": vae_choices,
@@ -232,6 +233,8 @@ async def scan_models_api(req: UIScanModelsRequest):
     if not p.exists() or not p.is_dir():
         raise HTTPException(status_code=400, detail=f"路径不存在或不是有效文件夹: {p}")
 
+    global MODELS_DIR
+    MODELS_DIR = p
     update_models_dir(p)
     rel_p = to_rel_or_abs(p)
     APP_CONFIG["models_dir"] = rel_p
@@ -257,6 +260,7 @@ async def scan_models_api(req: UIScanModelsRequest):
 
 @router.post("/api/models/preset/delete")
 async def delete_preset_api(req: UIDeletePresetRequest):
+    global MODELS_DIR
     target = req.models_dir.strip()
     hist = APP_CONFIG.setdefault("models_dir_history", [to_rel_or_abs(MODELS_DIR)])
     if target in hist:
@@ -270,6 +274,7 @@ async def delete_preset_api(req: UIDeletePresetRequest):
         p = Path(hist[0])
         if not p.is_absolute():
             p = (BASE_DIR / p).resolve()
+        MODELS_DIR = p
         update_models_dir(p)
 
     save_config(APP_CONFIG)

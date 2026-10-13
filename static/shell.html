@@ -654,7 +654,7 @@
       </div>
       <div class="form-row">
         <input type="text" class="form-input" id="input-dir" value="models">
-        <button class="btn btn-flush" onclick="alert('请直接在输入框编辑路径或从历史下拉中选择')">修改</button>
+        <button class="btn btn-flush" onclick="scanModels()">修改</button>
       </div>
       <span style="font-size:11px;color:#a1a1aa;" id="txt-scan-stat">已扫描到模型库并与 Web 端完全同步</span>
     </div>
@@ -884,7 +884,7 @@
           document.getElementById('disp-diff').innerText = curDiff.replace('.safetensors', '').replace('.gguf', '') || "默认";
           document.getElementById('disp-te').innerText = curTe.replace('.safetensors', '').replace('.gguf', '') || "自动匹配";
           document.getElementById('disp-vae').innerText = (curVae || "ae.safetensors") + ` · ${curSteps}步`;
-          document.getElementById('input-dir').value = d.models_dir || "models";
+          document.getElementById('input-dir').value = d.models_dir || (d.config && d.config.models_dir) || "models";
 
           populateSelect('sel-diff', d.diff_choices || [], curDiff);
           populateSelect('sel-te', d.te_choices || [], curTe);
