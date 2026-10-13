@@ -1054,6 +1054,15 @@
               listenerText.innerText = '实时监听中';
               listenerText.style.color = '#10b981';
             }
+          } else {
+            if (dot) {
+              dot.style.background = '#71717a';
+              dot.style.boxShadow = 'none';
+            }
+            if (listenerText) {
+              listenerText.innerText = '静默待命';
+              listenerText.style.color = '#71717a';
+            }
           }
           const syncEl = document.getElementById('event-sync-state');
           if (syncEl) {
