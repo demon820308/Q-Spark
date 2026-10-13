@@ -1064,7 +1064,7 @@
                 }
                 logLines.push(l);
             }
-            if (logLines.length > 30) logLines = logLines.slice(-30);
+            if (logLines.length > 120) logLines = logLines.slice(-120);
             const box = document.getElementById('terminal-logs');
             box.innerText = logLines.join('\n') + '\n';
             box.scrollTop = box.scrollHeight;
@@ -1112,6 +1112,7 @@
             }
             pWrapper.classList.add('active');
             pFill.style.width = '5%';
+            pFill.style.backgroundColor = '';
             pPct.innerText = '5%';
             pDesc.innerText = '正在启动任务...';
             infoBox.innerText = '正在启动生成任务...';
@@ -1194,11 +1195,17 @@
                         const dataStr = line.replace(/^data:\s*/, '');
                         if (dataStr === '[DONE]') continue;
 
+                        let data;
                         try {
-                            const data = JSON.parse(dataStr);
-                            if (data.error) {
-                                throw new Error(data.error);
-                            }
+                            data = JSON.parse(dataStr);
+                        } catch (pe) {
+                            console.error("JSON 解析错误:", pe, dataStr);
+                            continue;
+                        }
+
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
 
                             if (data.pct !== undefined) {
                                 const pctVal = Math.round(data.pct * 100);
@@ -1222,17 +1229,16 @@
                                 infoBox.innerHTML = `✨ <strong>生成成功</strong>！耗时: <code>${data.cost}s</code> | 分辨率: <code>${currentW}x${currentH}</code> | 模型: <code>${data.diff_model || ''}</code>`;
                                 appendLogs(`>>> 任务完成，总耗时 ${data.cost}s\n`);
                             }
-                        } catch (pe) {
-                            console.error("JSON 解析错误:", pe, dataStr);
-                        }
                     }
                 }
             } catch (err) {
                 if (err.name === 'AbortError') {
                     infoBox.innerHTML = `⏹️ <strong>任务已手动终止</strong>`;
                 } else {
-                    infoBox.innerHTML = `❌ <strong>生成失败</strong>: ${err.message}`;
-                    appendLogs(`\n[ERROR] ${err.message}\n`);
+                    const firstLine = (err.message || '').split('\n')[0];
+                    infoBox.innerHTML = `❌ <strong>生成失败</strong>: ${escapeHtml(firstLine)}`;
+                    pDesc.innerText = "生成失败";
+                    pFill.style.backgroundColor = '#ef4444';
                 }
             } finally {
                 if (stopBtn) stopBtn.style.display = 'none';

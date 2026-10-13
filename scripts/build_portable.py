@@ -295,7 +295,7 @@ def build_portable(version: str, output_dir: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="0.2.4", help="Release version (default: 0.2.4)")
+    parser.add_argument("--version", default="0.2.5", help="Release version (default: 0.2.5)")
     parser.add_argument("--output-dir", default=None, help="Output directory for zip")
     args = parser.parse_args()
 

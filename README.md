@@ -3,7 +3,7 @@
   <h1>Q-Spark Studio</h1>
   <p><strong>High-performance, lightweight local AI image generation studio powered by stable-diffusion.cpp with OpenAI-compatible Agent API.</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.4</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.5</a> ·
     <a href="#key-features">Key Features</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#models-catalog">Models Catalog</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=Release" alt="Latest Release" /></a>
-    <img src="https://img.shields.io/badge/Version-v0.2.4-green" alt="Version v0.2.4" />
+    <img src="https://img.shields.io/badge/Version-v0.2.5-green" alt="Version v0.2.5" />
     <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/Engine-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ Engine" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,30 +31,29 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 ---
 
-## 🌟 Key Features in v0.2.4
+## 🌟 Key Features in v0.2.5
 
-### 1. 🔍 Hardware-Accelerated Image Super-Resolution (C++ Upscale Engine)
+### 1. 🛡️ Precise Architecture Conflict Diagnostics & True Error Reporting
+- **Faithful C++ Crash Reproduction**: Accurately extracts the single core assertion or crash signature (e.g., `GGML_ASSERT(ggml_can_repeat)` or `scale_nelements`) from the underlying C++ process, eliminating swallowed errors and false positives.
+- **Dedicated NVFP4 Quantization Diagnostics**: Directly identifies non-standard NVFP4 2D block-scaled weights in raw FP8 models (failing on `scale_nelements`), pointing users directly to `Fix-convert` dequantization.
+- **Cross-Architecture Dimension Mismatch Checks**: Dissects hidden dimension conflicts between Z-Image (2048-dim) and Qwen-Image (3584-dim) text encoders with actionable suite-pairing advice.
+
+### 2. 🎨 VAE Compatibility A + B Dual Safeguard
+- **Layer A Pre-flight Warning**: Performs instant pre-flight checks before loading models; highlights cross-family VAE mismatches (e.g., Z-Image with Qwen VAE, or Qwen with Flux VAE) directly in the startup log.
+- **Layer B Runtime Exception Catch**: Catches latent decoder crashes and provides specific VAE swap instructions to prevent black or garbled images.
+
+### 3. 🖥️ Enhanced Live Telemetry & Log UX
+- **Expanded Log Buffer**: Increases live log retention to 120 lines so initial run configurations and pipeline stages (`[1/4]`, `[2/4]`) are never pushed out by subsequent output.
+- **Seamless Inline Error Rendering**: Renders diagnostic cards immediately beneath the failing stage without clearing existing execution context.
+
+### 4. 🔍 Hardware-Accelerated Image Super-Resolution (C++ Upscale Engine)
 - **Native C++ Tiled Upscaling**: Deeply integrated with `stable-diffusion.cpp -M upscale` engine, supporting 2x smooth fidelity and 4x ultra-resolution output in 1~2 seconds.
 - **Out-of-the-Box Bundled Model**: Bundles `4x-UltraSharp.pth` (~64MB) for instant out-of-the-box upscale; place any additional third-party models into `models/upscale_models` for automatic UI detection.
 - **Real-Time Tile Step Telemetry**: Sub-second console stream parsing of tile counts (`cur/total`), offering live visual progress bars in both the dedicated upscale tab and gallery modal.
 
-### 2. 🖼️ Gallery End-to-End Upscaling & Metadata Preservation
+### 5. 🖼️ Gallery End-to-End Upscaling & Metadata Preservation
 - **1-Click Gallery Modal Upscaling**: Direct 2x / 4x upscale buttons with a compact model switcher dropdown, synchronizing hot-swapped models across tabs in real time.
 - **Generation Parameter Inheritance**: Preserves original generation metadata (Prompt, Negative Prompt, Seed, Steps, CFG, Base Model, LoRAs) while appending upscale model and scale tags, complete with dedicated gallery filtering.
-
-### 3. 🖥️ Immersive Fullscreen Viewer (1:1 Drag-to-Pan)
-- **Flexbox Negative-Overflow Trap Resolved**: Clean CSS `margin: auto` anchoring eliminates viewport clipping, ensuring 100% of the image canvas is scrollable.
-- **Mouse Left-Click Drag-to-Pan**: Click-and-drag panning (`cursor: grab` -> `grabbing`) in 1:1 view for effortless inspection of 4K/8K images without clumsy scrollbar hunting.
-
-### 4. 🖥️ Native Desktop Shell & System Tray Host (`Q-Spark.exe`)
-- **Immersive Dark Shell**: Sleek dark desktop application window built with pure native Windows components, banishing command-line console clutter.
-- **Windows JobObject Process Guardianship**: Kernel-level process tree binding ensures all child engines (Python backend, CUDA inference server) cleanly shut down with zero orphaned processes or port leaks.
-- **Seamless System Tray Integration**: Minimize (`—`) or close (`×`) to tray in milliseconds, keeping backend services active for external agents. Double-click tray icon to restore.
-
-### 5. 🤖 Universal AI Agent Live Telemetry & Monitoring Dashboard
-- **Real-Time Agent Activity Feed**: Live monitoring of external AI Agents (Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code, etc.) with prompt inspection and timing metrics.
-- **Adaptive Multi-Line Prompt Display**: Long prompts expand responsively with formatted dark scrollbars and selectable text for easy clipboard copying.
-- **Zero-Spam On-Demand Polling Switch**: Built-in sleek skewed ON/OFF toggle switch. Defaults to 0 background requests to keep terminal logs clean, while supporting live streaming or single `[⟳ Refresh]` on demand.
 
 ---
 
@@ -64,7 +63,7 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 No Python installation required. No dependencies or build tools needed.
 
-1. Download **`Q-Spark-0.2.4-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
+1. Download **`Q-Spark-0.2.5-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
 2. Extract the archive to any folder on your computer.
 3. Download your preferred models and place them into the `models/` directory (see [Models Catalog](#models-catalog) below).
 4. Double-click **`start.bat`** (or `Q-Spark.exe`).

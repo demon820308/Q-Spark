@@ -3,7 +3,7 @@
   <h1>Q-Spark 生图控制台</h1>
   <p><strong>基于 stable-diffusion.cpp C++ 原生引擎的轻量高性能本地 AI 生图工作室，支持兼容 OpenAI 的 Agent API。</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.4</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.5</a> ·
     <a href="#核心功能特性">核心特性</a> ·
     <a href="#快速上手">快速上手</a> ·
     <a href="#模型库与目录规范">模型库指引</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=%E7%89%88%E6%9C%AC" alt="最新版本" /></a>
-    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.4-green" alt="版本 v0.2.4" />
+    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.5-green" alt="版本 v0.2.5" />
     <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/%E5%BA%95%E5%B1%82%E5%BC%95%E6%93%8E-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ 引擎" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/%E5%BC%80%E6%BA%90%E5%8D%8F%E8%AE%AE-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,30 +31,29 @@
 
 ---
 
-## 🌟 v0.2.4 核心功能特性
+## 🌟 v0.2.5 核心功能特性
 
-### 1. 🔍 硬件加速图像超分辨率放大 (C++ Upscale Engine)
+### 1. 🛡️ 架构冲突精准排错与真实错误还原 (True Error Reporting)
+- **底层 C++ 报错真实还原**：当底层发生异常退出时，倒序精准提取真实断言行（如 `GGML_ASSERT(ggml_can_repeat)` 或 `scale_nelements`），彻底解决以往“吞没错误”或“张冠李戴误报”的痛点。
+- **NVFP4 非标量化精确诊断**：针对 Qwen 3.4B 原始 FP8 混量权重中的 NVFP4 微块量化层（`scale_nelements` 校验失败），提供精确的中文诊断与 `Fix-convert` 修复指引。
+- **跨架构维度不匹配智能诊断**：自动识别 Z-Image（2048 维）与 Qwen-Image-2.1（3584 维）文本编码器混用导致的张量广播冲突，给出清晰的成套搭配建议。
+
+### 2. 🎨 VAE 兼容性 A + B 双重保障
+- **Layer A 事前预检 (Pre-flight Warning)**：在启动 GPU 任务的第一秒，自动校验所选扩散主模型与 VAE 兼容性；若检测到跨体系错配（如 Z-Image 误选 Qwen VAE，或 Qwen 误选 Flux VAE），立即在日志中给出显眼警示。
+- **Layer B 事后异常捕获 (Runtime Catch)**：底层 VAE 解码器若发生崩溃，自动捕获专属异常并给出成套换回建议，彻底防止解码黑图或静默失败。
+
+### 3. 🖥️ 实时日志交互体验优化
+- **日志缓冲扩容**：终端日志缓冲容量由 30 行扩展至 120 行，确保前置任务规格与执行阶段步骤绝对不被顶出截断。
+- **紧凑追加渲染**：底层报错与排错诊断紧随失败步骤自然追加，不再清空或覆盖既有日志。
+
+### 4. 🔍 硬件加速图像超分辨率放大 (C++ Upscale Engine)
 - **原生 C++ 切块超分**：集成 `stable-diffusion.cpp -M upscale` 引擎，支持 2x 细腻平滑保真超分与 4x 极致超分辨率，1~2 秒内输出超清大图。
 - **开箱内置首选模型**：便携版开箱内置最优超分模型 `4x-UltraSharp.pth`（约 64MB），开箱即用；支持在 `models/upscale_models` 放入任意第三方超分模型，界面自动识别列出。
 - **分块切块 (Tile) 推理实时进度指示**：毫秒级解析底层控制台切块计数（如 `2/9`），独立超分工作区与画廊弹窗均配备动态进度条与运行状态指示。
 
-### 2. 🖼️ 历史画廊全链路超分闭环与元数据继承
+### 5. 🖼️ 历史画廊全链路超分闭环与元数据继承
 - **画廊弹窗一键放大**：画廊详情中直接提供 2x / 4x 放大入口，并配备紧凑的放大模型选择下拉框，两端模型切换双向实时同步。
 - **完美继承原始生成参数**：超分图片完整保留源图的 Prompt、负向词、种子、步数、CFG、模型架构与挂载 LoRA，仅追加放大模型与放大倍数，画廊卡片支持“🔍 图像超分放大”标签与筛选。
-
-### 3. 🖥️ 沉浸式全屏原图查看器 (1:1 拖拽漫游)
-- **彻底根治 Flexbox 居中滚动截断**：应用标准 CSS `margin: auto`，超大图展开 1:1 时左上角自动吸附起点，向右下自然溢出，保证 100% 滚到整张图片的每一个角落。
-- **鼠标左键抓手拖拽平移 (Drag-to-Pan)**：在 1:1 模式下直接按住鼠标左键即可平移漫游，单击图片快速适应屏幕，提供流畅顺滑的专业看图体验。
-
-### 4. 🖥️ 原生桌面守护宿主与系统托盘 (`Q-Spark.exe`)
-- **沉浸式暗色宿主视窗**：纯原生组件构建的高颜值桌面监控宿主视窗，彻底告别简陋黑框命令行终端。
-- **Windows JobObject 进程树护航**：内核级绑定所有子进程（Python 服务、C++ 推理后端），退出完全回收，严防任何僵尸进程与端口残留。
-- **微信/网易云级托盘无缝交互**：点击最小化（`—`）或关闭（`×`）秒进系统托盘，后台服务平稳常驻保障外部 Agent 接口不中断；双击图标秒级唤醒。
-
-### 5. 🤖 外部 Agent 接入实时监控看板
-- **实时调用流监控**：即时捕获外部 Agent（Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code 等）的生图请求、模型参数与耗时。
-- **提示词长文本自适应展开**：提示词卡片动态撑开多行，配备暗色极简微型滚动条，支持鼠标任意划选复制。
-- **零刷屏按需轮询开关**：内置现代几何暗色科技风 ON/OFF 滑动开关，默认完全静默（0 接口请求不刷屏控制台），支持按需开启长轮询或单次 `[⟳ 刷新]`。
 
 ---
 
@@ -64,7 +63,7 @@
 
 无需安装 Python，无需配置环境或下载 pip 依赖包，解压即用！
 
-1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.4-windows-x64-portable.zip`**；
+1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.5-windows-x64-portable.zip`**；
 2. 解压到电脑上的任意文件夹；
 3. 将下载好的模型放入 `models/` 对应子目录中（详见下方 [模型库与目录规范](#模型库与目录规范)）；
 4. 双击运行 **`start.bat`**（或 `Q-Spark.exe`）；

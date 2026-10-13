@@ -377,6 +377,31 @@ class InferenceEngine:
 
         return "已成功终止当前生成任务。" if stopped else "当前无正在运行的生成任务。"
 
+    @staticmethod
+    def _diagnose_error(err_text: str) -> str:
+        low = err_text.lower()
+        if "scale_nelements" in err_text or "comfy_quant" in low or "weight_scale_2" in low or "nvfp4" in low:
+            return (
+                "\n💡 【排错诊断】：文本编码器包含非标 NVFP4 量化权重！\n"
+                "👉 原因：当前选用的文本编码器存在 C++ 引擎无法解析的 NVFP4 2D 微块量化层 (scale_nelements 校验失败)。\n"
+                "👉 解决：请选用 Fix-convert 修复后的 fixed 版本（如 qwen_3_4b_fp8_mixed_fixed.safetensors），或使用标准版本。\n"
+            )
+        if "ggml_can_repeat" in err_text:
+            return (
+                "\n💡 【排错诊断】：模型特征维度不匹配！\n"
+                "👉 原因：扩散模型与文本编码器跨体系混搭（例如 Z-Image 误配了 Qwen-VL 8B，或 Qwen-Image-2.1 误配了 Qwen 3.4B）。\n"
+                "👉 解决：请参考模型指南成套搭配（如 Z-Image 搭配 qwen_3_4b，Qwen-Image 搭配 qwen3vl_8b）。\n"
+            )
+        if "out of memory" in low or "cudamalloc" in low:
+            return "\n💡 【排错诊断】：显存不足 (Out of Memory)！建议调低分辨率或换用显存占用更低的量化模型。\n"
+        if any(k in low for k in ["auto_encoder_kl", "decode_first_stage", "vae decoder", "vae_conv", "failed to load vae"]):
+            return (
+                "\n💡 【排错诊断】：VAE 模型与主架构不匹配！\n"
+                "👉 原因：当前扩散主模型无法兼容所选 VAE 解码器权重。\n"
+                "👉 解决：Z-Image 请搭配 ae.safetensors；Qwen-Image 请搭配 qwen_image_2.1_vae_bf16.safetensors。\n"
+            )
+        return ""
+
     async def _stream_sd_cli(self, cmd, cwd) -> AsyncGenerator[dict, None]:
         """异步生成器：实时流式输出控制台日志 + 产出结构化进度事件"""
         self.is_task_stopped = False
@@ -464,8 +489,26 @@ class InferenceEngine:
                 yield {"pct": 0.0, "desc": "任务已手动终止", "log": ">>> ⏹️ 任务已由用户手动终止。\n"}
                 return
             if ret != 0:
-                err_msg = "".join(error_lines[-15:])
-                raise RuntimeError(f"sd-cli 执行失败 (代码 {ret}):\n{err_msg}")
+                core_err = ""
+                for l in reversed(error_lines):
+                    cleaned = l.strip()
+                    if not cleaned:
+                        continue
+                    if any(k in cleaned for k in ["GGML_ASSERT", "failed", "error:", "CUDA error", "Exception", "Aborted", "invalid"]):
+                        core_err = cleaned
+                        break
+                if not core_err and error_lines:
+                    core_err = error_lines[-1].strip()
+
+                err_summary = "".join(error_lines[-15:])
+                hint = self._diagnose_error(err_summary)
+                log_chunk = f"\n❌ [底层报错] {core_err}\n{hint}" if hint else f"\n❌ [底层报错] {core_err}\n"
+                yield {
+                    "pct": 0.0,
+                    "desc": f"推理进程异常 (代码 {ret})",
+                    "log": log_chunk,
+                }
+                raise RuntimeError(f"推理引擎异常退出 (代码 {ret}): {core_err}")
         finally:
             self.current_cli_proc = None
 
@@ -623,28 +666,6 @@ class InferenceEngine:
             te_model = te_model or APP_CONFIG.get("api_te_model") or (te_list[0] if te_list else "")
             vae_model = vae_model or APP_CONFIG.get("api_vae_model") or (vae_list[0] if vae_list else "")
 
-            # 智能架构自适应成套匹配 (防止用户修改主模型时因 TE/VAE 不匹配报错)
-            if "z_image" in (diff_model or "").lower():
-                if not te_model or "qwen3vl" in te_model.lower() or "qwen-image" in te_model.lower():
-                    cand_te = next((t for t in te_list if "qwen_3_4b" in t.lower() and "fixed" in t.lower()), None)
-                    if not cand_te:
-                        cand_te = next((t for t in te_list if "qwen_3_4b" in t.lower()), None)
-                    if cand_te:
-                        te_model = cand_te
-                if not vae_model or "qwen" in vae_model.lower():
-                    cand_vae = next((v for v in vae_list if v.lower() == "ae.safetensors" or "flux" in v.lower()), None)
-                    if cand_vae:
-                        vae_model = cand_vae
-            elif "qwen" in (diff_model or "").lower():
-                if not te_model or "qwen_3_4b" in te_model.lower():
-                    cand_te = next((t for t in te_list if "qwen3vl" in t.lower() or "qwen-image" in t.lower()), None)
-                    if cand_te:
-                        te_model = cand_te
-                if not vae_model or "ae." in vae_model.lower() or "flux" in vae_model.lower():
-                    cand_vae = next((v for v in vae_list if "qwen" in v.lower()), None)
-                    if cand_vae:
-                        vae_model = cand_vae
-
             if steps is None or int(steps) <= 0:
                 steps = APP_CONFIG.get("api_steps") or get_model_default_steps(diff_model)
             steps = int(steps)
@@ -757,6 +778,15 @@ class InferenceEngine:
             if ref_img_paths and not is_txt2img_mode:
                 ref_log = f">>> 挂载视觉参考图 ({len(ref_img_paths)} 张): {', '.join(f'<image{i+1}>: {p.name}' for i, p in enumerate(ref_img_paths))}\n"
 
+            # VAE 架构兼容性事前预检 (Pre-flight 双重保障 Layer A)
+            vae_warn = ""
+            d_low = (diff_model or "").lower()
+            v_low = (vae_model or "").lower()
+            if "z_image" in d_low and "qwen" in v_low:
+                vae_warn = "⚠️ [VAE 搭配预警]：Z-Image 属于 Flux 体系，当前搭配了 Qwen VAE，可能导致解码异常或花屏！推荐搭配: ae.safetensors\n"
+            elif "qwen" in d_low and ("ae." in v_low or "flux" in v_low):
+                vae_warn = "⚠️ [VAE 搭配预警]：Qwen-Image 需专属 VAE，当前搭配了 Flux VAE (ae)，可能导致解码异常！推荐搭配: qwen_image_2.1_vae_bf16.safetensors\n"
+
             info_log = (
                 f"{mode_log}"
                 f">>> 任务规格: {width}x{height} | 采样步数: {steps} | CFG: {effective_cfg} | 随机种子: {seed}\n"
@@ -764,6 +794,7 @@ class InferenceEngine:
                 f">>> 扩散模型: {diff_model}\n"
                 f">>> 文本编码: {te_model}\n"
                 f">>> VAE 解码: {vae_model}\n"
+                f"{vae_warn}"
                 f"{lora_log}"
                 f"{ref_log}"
             )
