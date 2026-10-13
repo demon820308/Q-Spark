@@ -46,5 +46,6 @@ python "<skill_dir>/scripts/generate.py" --prompt "<prompt>" [--size "<width>x<h
 3. **Steps**:
    - By default, omit `--steps` so it automatically uses the recommended steps configured in `config.json` (e.g., 8 for Turbo models).
 4. **Display Result**:
-   - The script outputs the image path, markdown link, and `MODEL_USED: <model_name>`.
-   - Embed the clickable markdown preview link `![Generated Image](file:///path/to/outputs/...)` and mention the active model used in the response.
+   - The script outputs the image path, markdown links (`MARKDOWN:`, `MARKDOWN_HTTP:`, `MARKDOWN_FILE:`), and `MODEL_USED: <model_name>`.
+   - Prefer the default relative markdown link from `MARKDOWN:` (e.g. `![Generated Image](outputs/...)`). This ensures images display reliably across webview-based environments (like Pi Web, VS Code, Cursor) without `file:///` security blocks, and remain permanently viewable from disk even when the Q-Spark service is closed.
+   - Mention the active model used in the response.

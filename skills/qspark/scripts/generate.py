@@ -105,12 +105,27 @@ def main():
     if b64_str:
         out_path.write_bytes(base64.b64decode(b64_str))
 
-    link_path = str(out_path).replace("\\", "/")
+    # 计算相对路径与各种链接格式
+    try:
+        rel_path = os.path.relpath(out_path, start=os.getcwd()).replace("\\", "/")
+    except Exception:
+        rel_path = str(out_path).replace("\\", "/")
+
+    abs_link = str(out_path).replace("\\", "/")
+    http_link = remote_url or f"{args.host.rstrip('/')}/outputs/{out_path.name}"
+
     print(f"SUCCESS: Image saved to {out_path}")
     if model_used:
         print(f"MODEL_USED: {model_used}")
     print(f"FILE: {out_path}")
-    print(f"MARKDOWN: ![Generated Image](file:///{link_path})")
+    if http_link:
+        print(f"URL: {http_link}")
+    # 默认输出相对路径：兼容 Pi Web / VS Code 等 Chromium webview 环境，且在服务关闭后永久离线可看
+    print(f"MARKDOWN: ![Generated Image]({rel_path})")
+    # 备选格式：HTTP 格式与 file:/// 绝对路径格式
+    if http_link:
+        print(f"MARKDOWN_HTTP: ![Generated Image]({http_link})")
+    print(f"MARKDOWN_FILE: ![Generated Image](file:///{abs_link})")
 
 
 if __name__ == "__main__":
