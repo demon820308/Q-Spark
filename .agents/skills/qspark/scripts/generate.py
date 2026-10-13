@@ -2,11 +2,20 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+# 确保 Windows 终端 UTF-8 编码安全，防止 GBK 终端在输出 Emoji 时抛出 UnicodeEncodeError
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 def resolve_default_output_dir() -> Path:
@@ -31,7 +40,11 @@ def check_info(host: str):
         print(f"CONFIG_DIFF_MODEL: {cfg.get('api_diff_model', '跟随首选')}")
         print(f"CONFIG_STEPS: {cfg.get('api_steps', 8)}")
         print(f"CONFIG_MODELS_DIR: {data.get('models_dir', '')}")
-        print(f"API_STATUS: {data.get('api_status_text', '')}")
+        # 清洗 Emoji 与 Markdown 标记，确保任何控制台输出纯净且绝不触发编码崩溃
+        status_raw = data.get("api_status_text", "")
+        status_clean = re.sub(r'[\U00010000-\U0010ffff]', '', status_raw).replace("**", "").replace("`", "").strip()
+        if status_clean:
+            print(f"API_STATUS: {status_clean}")
     except Exception as e:
         sys.stderr.write(f"[Error] 获取服务配置状态失败: {e}\n")
         sys.exit(1)
