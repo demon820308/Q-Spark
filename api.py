@@ -144,6 +144,13 @@ class UIDeletePresetRequest(BaseModel):
     models_dir: str
 
 
+class UIUpscaleRequest(BaseModel):
+    image: str
+    upscale_model: str
+    scale: int = 2
+    tile_size: Optional[int] = 128
+
+
 # ==============================================================================
 # 1. 显存与硬件监控 API
 # ==============================================================================
@@ -175,7 +182,7 @@ async def get_metrics_api(response: Response):
 # ==============================================================================
 @router.get("/api/config")
 async def get_ui_config():
-    diff_choices, te_choices, vae_choices, lora_choices = scan_models()
+    diff_choices, te_choices, vae_choices, lora_choices, upscale_choices = scan_models()
     return {
         "config": APP_CONFIG,
         "models_dir": to_rel_or_abs(MODELS_DIR),
@@ -184,6 +191,7 @@ async def get_ui_config():
         "te_choices": te_choices,
         "vae_choices": vae_choices,
         "lora_choices": lora_choices,
+        "upscale_choices": upscale_choices,
         "status_text": engine.get_status_text(),
         "api_status_text": get_api_model_status_text(),
         "engine_mode": engine.mode,
@@ -233,7 +241,7 @@ async def scan_models_api(req: UIScanModelsRequest):
         hist.insert(0, rel_p)
     save_config(APP_CONFIG)
 
-    diff_choices, te_choices, vae_choices, lora_choices = scan_models(p)
+    diff_choices, te_choices, vae_choices, lora_choices, upscale_choices = scan_models(p)
     return {
         "success": True,
         "models_dir": rel_p,
@@ -242,7 +250,8 @@ async def scan_models_api(req: UIScanModelsRequest):
         "te_choices": te_choices,
         "vae_choices": vae_choices,
         "lora_choices": lora_choices,
-        "message": f"模型目录已更新并扫描：主模型 {len(diff_choices)} 个 | 文本编码器 {len(te_choices)} 个 | VAE {len(vae_choices)} 个 | LoRA {len(lora_choices)} 个",
+        "upscale_choices": upscale_choices,
+        "message": f"模型目录已更新并扫描：主模型 {len(diff_choices)} 个 | 文本编码器 {len(te_choices)} 个 | VAE {len(vae_choices)} 个 | LoRA {len(lora_choices)} 个 | 超分模型 {len(upscale_choices)} 个",
     }
 
 
@@ -264,7 +273,7 @@ async def delete_preset_api(req: UIDeletePresetRequest):
         update_models_dir(p)
 
     save_config(APP_CONFIG)
-    diff_choices, te_choices, vae_choices, lora_choices = scan_models()
+    diff_choices, te_choices, vae_choices, lora_choices, upscale_choices = scan_models()
     return {
         "success": True,
         "models_dir": APP_CONFIG.get("models_dir"),
@@ -273,6 +282,7 @@ async def delete_preset_api(req: UIDeletePresetRequest):
         "te_choices": te_choices,
         "vae_choices": vae_choices,
         "lora_choices": lora_choices,
+        "upscale_choices": upscale_choices,
         "message": f"已从预设列表中删除目录：{target}",
     }
 
@@ -352,7 +362,7 @@ async def openai_get_models():
     """返回符合 OpenAI 规范的模型列表，动态反映 config.json 与当前扫描到的模型"""
     current_model = APP_CONFIG.get("api_diff_model") or ""
     current_id = Path(current_model).stem if current_model else "q-spark"
-    diff_choices, _, _, _ = scan_models()
+    diff_choices, _, _, _, _ = scan_models()
 
     seen = set()
     model_ids = []
@@ -617,8 +627,12 @@ async def get_history_api(response: Response, page: int = 1, page_size: int = 24
             if not img_path.exists():
                 continue
             data["image_url"] = f"/outputs/{fn}"
-            if source and source != "all" and data.get("source") != source:
-                continue
+            if source and source != "all":
+                if source == "web_upscale":
+                    if not (data.get("source") == "web_upscale" or data.get("upscale_scale")):
+                        continue
+                elif data.get("source") != source:
+                    continue
             records.append(data)
         except Exception:
             continue
@@ -670,3 +684,31 @@ async def delete_history_api(filename: str):
         "deleted_img": deleted_img,
         "deleted_json": deleted_json,
     }
+
+
+# ==============================================================================
+# 6. 超分辨率图像放大 API
+# ==============================================================================
+@router.post("/api/upscale")
+async def upscale_image_api(req: UIUpscaleRequest):
+    if req.scale not in (2, 4):
+        raise HTTPException(status_code=400, detail="放大倍数仅支持 2x 或 4x")
+    if not req.image:
+        raise HTTPException(status_code=400, detail="请提供需要放大的图片")
+    if not req.upscale_model:
+        raise HTTPException(status_code=400, detail="请选择超分辨率模型")
+    try:
+        res = await engine.run_upscale_task(
+            image_input=req.image,
+            upscale_model=req.upscale_model,
+            scale=req.scale,
+            tile_size=req.tile_size or 128,
+        )
+        return res
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"超分处理失败: {e}")
+

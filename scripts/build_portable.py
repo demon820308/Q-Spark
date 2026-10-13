@@ -243,13 +243,39 @@ def build_portable(version: str, output_dir: str):
             shutil.copytree(src_s, os.path.join(build_dir, skill_dir), dirs_exist_ok=True)
             log(f"Copied {skill_dir}/ directory")
 
-    # 5. Create empty directories
-    for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "models/loras", "outputs", "outputs/json", "inputs"]:
+    # 5. Create directories & bundle upscale models
+    for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "models/loras", "models/upscale_models", "outputs", "outputs/json", "inputs"]:
         d = os.path.join(build_dir, sub)
         os.makedirs(d, exist_ok=True)
         # Place empty marker
         with open(os.path.join(d, ".keep"), "w", encoding="utf-8") as f:
             f.write("")
+
+    # 5.1 Copy all upscale models from local models/upscale_models (e.g. 4x-UltraSharp.pth and any other models)
+    local_upscale = os.path.join(root_dir, "models", "upscale_models")
+    staging_upscale = os.path.join(build_dir, "models", "upscale_models")
+    valid_upscale_exts = {".pth", ".pt", ".safetensors", ".bin", ".onnx", ".gguf"}
+    bundled_count = 0
+    if os.path.exists(local_upscale):
+        for f in os.listdir(local_upscale):
+            ext = os.path.splitext(f)[1].lower()
+            if ext in valid_upscale_exts:
+                src_f = os.path.join(local_upscale, f)
+                dst_f = os.path.join(staging_upscale, f)
+                shutil.copy2(src_f, dst_f)
+                bundled_count += 1
+                log(f"Bundled upscale model: {f} ({os.path.getsize(src_f) / (1024*1024):.1f} MB)")
+
+    # 5.2 若构建环境缺少默认超分模型 (如在全新纯净 GitHub Actions CI 虚拟机中)，自动下载 4x-UltraSharp.pth 确保开箱即用
+    ultrasharp_dst = os.path.join(staging_upscale, "4x-UltraSharp.pth")
+    if not os.path.exists(ultrasharp_dst):
+        log("No 4x-UltraSharp.pth found in staging. Downloading default upscale model...")
+        try:
+            hf_url = "https://huggingface.co/lokcx/4x-UltraSharp/resolve/main/4x-UltraSharp.pth"
+            download_file(hf_url, ultrasharp_dst)
+            log("Default 4x-UltraSharp.pth downloaded successfully.")
+        except Exception as e:
+            log(f"Warning: Failed to download 4x-UltraSharp.pth: {e}")
 
     # 6. Package into ZIP
     final_zip = os.path.join(output_dir, f"{target_name}.zip")
@@ -269,7 +295,7 @@ def build_portable(version: str, output_dir: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="0.1.0", help="Release version (default: 0.1.0)")
+    parser.add_argument("--version", default="0.2.4", help="Release version (default: 0.2.4)")
     parser.add_argument("--output-dir", default=None, help="Output directory for zip")
     args = parser.parse_args()
 

@@ -3,7 +3,7 @@
   <h1>Q-Spark Studio</h1>
   <p><strong>High-performance, lightweight local AI image generation studio powered by stable-diffusion.cpp with OpenAI-compatible Agent API.</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.3</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.4</a> ·
     <a href="#key-features">Key Features</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#models-catalog">Models Catalog</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=Release" alt="Latest Release" /></a>
-    <img src="https://img.shields.io/badge/Version-v0.2.3-green" alt="Version v0.2.3" />
+    <img src="https://img.shields.io/badge/Version-v0.2.4-green" alt="Version v0.2.4" />
     <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/Engine-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ Engine" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -23,40 +23,38 @@
 
 ## ⚡ High Performance. Low VRAM. All-in-One Studio.
 
-| 🚀 Blazing Fast & Uncensored | 🎨 All-in-One Creative Studio | 🔌 Agent & Workflow Ready |
+| 🚀 Blazing Fast & Uncensored | 🎨 Creation & Upscale Pipeline | 🔌 Agent & Workflow Ready |
 | :--- | :--- | :--- |
-| **Qwen-Image-2.1-Turbo** (6~8 steps) & **Z-Image Turbo** (8~9 steps) local inference. Native pure C++ GGML CUDA engine running comfortably on 8~10GB GPUs (RTX 3060 / 3080 / 4060). | Seamless integration of **Text-to-Image (txt2img)** and **Multimodal Image Instruction Editing (Image Edit)** in an intuitive workbench. | Standard OpenAI-compatible `/v1/images/generations` HTTP API for Dify, Cherry Studio, Chatbox, and multi-agent workflows. |
+| **Qwen-Image-2.1-Turbo** & **Z-Image Turbo** local inference. Native pure C++ GGML CUDA engine running comfortably on 8~10GB GPUs (RTX 3060 / 3080 / 4060). | Seamless integration of **Text-to-Image**, **Instruction Editing**, and **C++ Hardware-Accelerated Upscaling (2x/4x)** with real-time tile tracking and infinite drag-to-pan preview. | Standard OpenAI-compatible `/v1/images/generations` HTTP API for Dify, Cherry Studio, Chatbox, and multi-agent workflows. |
 
 Local workflows run 100% on your own hardware. Zero telemetry, zero cloud dependency, complete privacy.
 
 ---
 
-## 🌟 Key Features in v0.2.3
+## 🌟 Key Features in v0.2.4
 
-### 1. 🖥️ Native Desktop Shell & System Tray Host (`Q-Spark.exe`)
+### 1. 🔍 Hardware-Accelerated Image Super-Resolution (C++ Upscale Engine)
+- **Native C++ Tiled Upscaling**: Deeply integrated with `stable-diffusion.cpp -M upscale` engine, supporting 2x smooth fidelity and 4x ultra-resolution output in 1~2 seconds.
+- **Out-of-the-Box Bundled Model**: Bundles `4x-UltraSharp.pth` (~64MB) for instant out-of-the-box upscale; place any additional third-party models into `models/upscale_models` for automatic UI detection.
+- **Real-Time Tile Step Telemetry**: Sub-second console stream parsing of tile counts (`cur/total`), offering live visual progress bars in both the dedicated upscale tab and gallery modal.
+
+### 2. 🖼️ Gallery End-to-End Upscaling & Metadata Preservation
+- **1-Click Gallery Modal Upscaling**: Direct 2x / 4x upscale buttons with a compact model switcher dropdown, synchronizing hot-swapped models across tabs in real time.
+- **Generation Parameter Inheritance**: Preserves original generation metadata (Prompt, Negative Prompt, Seed, Steps, CFG, Base Model, LoRAs) while appending upscale model and scale tags, complete with dedicated gallery filtering.
+
+### 3. 🖥️ Immersive Fullscreen Viewer (1:1 Drag-to-Pan)
+- **Flexbox Negative-Overflow Trap Resolved**: Clean CSS `margin: auto` anchoring eliminates viewport clipping, ensuring 100% of the image canvas is scrollable.
+- **Mouse Left-Click Drag-to-Pan**: Click-and-drag panning (`cursor: grab` -> `grabbing`) in 1:1 view for effortless inspection of 4K/8K images without clumsy scrollbar hunting.
+
+### 4. 🖥️ Native Desktop Shell & System Tray Host (`Q-Spark.exe`)
 - **Immersive Dark Shell**: Sleek dark desktop application window built with pure native Windows components, banishing command-line console clutter.
 - **Windows JobObject Process Guardianship**: Kernel-level process tree binding ensures all child engines (Python backend, CUDA inference server) cleanly shut down with zero orphaned processes or port leaks.
-- **Isolated Browser Sandbox**: Independent dedicated Edge profile preventing conflicts with existing personal browser sessions or Chromium ProcessSingleton locks.
+- **Seamless System Tray Integration**: Minimize (`—`) or close (`×`) to tray in milliseconds, keeping backend services active for external agents. Double-click tray icon to restore.
 
-### 2. 🛸 Seamless System Tray Integration (WeChat / NetEase Cloud Paradigm)
-- **Zero-Latency Tray Minimization**: Both minimize (`—`) and close (`×`) instantly minimize to the system notification tray in milliseconds.
-- **Uninterrupted Agent Services**: Keep backend models loaded and API endpoints responsive in the background for continuous AI Agent calls.
-- **1-Click Awakening & Clean Exit**: Double-click tray icon to restore the workspace instantly; clean shutdown via tray menu or top-bar `[🛑 Quit Application]` button.
-
-### 3. 🤖 Universal AI Agent Live Telemetry & Monitoring Dashboard
+### 5. 🤖 Universal AI Agent Live Telemetry & Monitoring Dashboard
 - **Real-Time Agent Activity Feed**: Live monitoring of external AI Agents (Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code, etc.) with prompt inspection and timing metrics.
 - **Adaptive Multi-Line Prompt Display**: Long prompts expand responsively with formatted dark scrollbars and selectable text for easy clipboard copying.
 - **Zero-Spam On-Demand Polling Switch**: Built-in sleek skewed ON/OFF toggle switch. Defaults to 0 background requests to keep terminal logs clean, while supporting live streaming or single `[⟳ Refresh]` on demand.
-
-### 4. ⚙️ Bidirectional Model & Config Hot-Sync
-- Desktop host and Web UI synchronize `config.json` in real time.
-- Hot-swap diffusion models, text encoders (TE), VAEs, and sampling steps on the fly with automatic architectural compatibility correction.
-
-### 5. 🎨 All-in-One Creative Workbench & Multimodal Image Editing
-- **Text-to-Image (txt2img)**: Pure text generation with model-aware step adaptation, random seed locking, and CFG scale control.
-- **Image Instruction Editing**: Multimodal instruction editing starting from clean empty noise with Vision Projector integration, avoiding base pixel contamination.
-- **Multi-Image References & Smart Token Mapping**: Feed up to 3 reference images with automatic natural language mapping ("图1" / "图片2" -> `<image1>` / `<image2>`).
-- **Real-Time Task Termination (⏹️ Stop Task)**: Millisecond-level process cancellation via UI button or `/api/task/stop`.
 
 ---
 
@@ -66,7 +64,7 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 No Python installation required. No dependencies or build tools needed.
 
-1. Download **`Q-Spark-0.2.3-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
+1. Download **`Q-Spark-0.2.4-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
 2. Extract the archive to any folder on your computer.
 3. Download your preferred models and place them into the `models/` directory (see [Models Catalog](#models-catalog) below).
 4. Double-click **`start.bat`** (or `Q-Spark.exe`).

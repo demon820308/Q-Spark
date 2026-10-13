@@ -5,6 +5,7 @@ import os
 import random
 import re
 import subprocess
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -184,12 +185,18 @@ def get_sub_dir(root: Path, names: list[str]) -> Path:
 
 
 def resolve_model_file(subfolder_names: list[str], filename: str) -> Path:
-    """在模型根目录下查找指定子目录中的具体模型文件"""
+    """在模型根目录下查找指定子目录中的具体模型文件，优先 MODELS_DIR，兜底本地 BASE_DIR / models"""
     global MODELS_DIR
-    for folder in subfolder_names:
-        candidate = MODELS_DIR / folder / filename
-        if candidate.exists():
-            return candidate
+    roots = [MODELS_DIR]
+    local_dir = BASE_DIR / "models"
+    if local_dir.resolve() != MODELS_DIR.resolve():
+        roots.append(local_dir)
+
+    for r in roots:
+        for folder in subfolder_names:
+            candidate = r / folder / filename
+            if candidate.exists():
+                return candidate
     return MODELS_DIR / subfolder_names[0] / filename
 
 
@@ -213,7 +220,10 @@ def scan_models(base_path: Optional[Path | str] = None):
     vae_dir = root / "vae"
     lora_dir = get_sub_dir(root, ["loras", "lora"])
 
+    upscale_dir = get_sub_dir(root, ["upscale_models", "esrgan", "upscale"])
+
     valid_exts = {".gguf", ".safetensors"}
+    valid_upscale_exts = {".pth", ".pt", ".safetensors", ".bin", ".onnx", ".gguf"}
 
     diff_models = [
         f.name for f in diff_dir.glob("*") if f.is_file() and f.suffix.lower() in valid_exts
@@ -231,21 +241,27 @@ def scan_models(base_path: Optional[Path | str] = None):
         f.name for f in lora_dir.glob("*") if f.is_file() and f.suffix.lower() in valid_exts
     ] if lora_dir.exists() else []
 
-    def sort_qwen(items: list[str]) -> list[str]:
-        qwen_items = [x for x in items if "qwen" in x.lower()]
-        other_items = [x for x in items if "qwen" not in x.lower()]
-        return qwen_items + other_items
+    upscale_candidates = set()
+    if upscale_dir.exists():
+        for f in upscale_dir.glob("*"):
+            if f.is_file() and f.suffix.lower() in valid_upscale_exts:
+                upscale_candidates.add(f.name)
 
-    diff_models = sort_qwen(diff_models)
-    te_models = sort_qwen(te_models)
-    vae_models = sort_qwen(vae_models)
-    lora_models = sorted(lora_models)
+    # 扫描项目本地 models/upscale_models 内置超分模型库 (支持放入任意其它超分模型)
+    local_upscale_dir = get_sub_dir(BASE_DIR / "models", ["upscale_models", "esrgan", "upscale"])
+    if local_upscale_dir.exists() and local_upscale_dir.resolve() != upscale_dir.resolve():
+        for f in local_upscale_dir.glob("*"):
+            if f.is_file() and f.suffix.lower() in valid_upscale_exts:
+                upscale_candidates.add(f.name)
+
+    upscale_models = sorted(list(upscale_candidates), key=lambda x: (0 if "ultrasharp" in x.lower() else 1, x.lower()))
 
     return (
         diff_models,
         te_models,
         vae_models,
         lora_models,
+        upscale_models,
     )
 
 
@@ -602,7 +618,7 @@ class InferenceEngine:
             if seed == -1:
                 seed = random.randint(1, 2**31 - 1)
 
-            diff_list, te_list, vae_list, lora_list = scan_models()
+            diff_list, te_list, vae_list, lora_list, _ = scan_models()
             diff_model = diff_model or APP_CONFIG.get("api_diff_model") or (diff_list[0] if diff_list else "")
             te_model = te_model or APP_CONFIG.get("api_te_model") or (te_list[0] if te_list else "")
             vae_model = vae_model or APP_CONFIG.get("api_vae_model") or (vae_list[0] if vae_list else "")
@@ -855,6 +871,184 @@ class InferenceEngine:
                     yield ev_done
             finally:
                 self.current_task = None
+
+    async def run_upscale_task(
+        self,
+        image_input: str,
+        upscale_model: str,
+        scale: int = 2,
+        tile_size: int = 128,
+    ) -> dict:
+        async with self.lock:
+            from PIL import Image
+            src_path = self.prepare_init_image(image_input)
+            if not src_path or not src_path.exists():
+                raise FileNotFoundError(f"找不到需要放大的输入图片: {image_input}")
+
+            model_path = resolve_model_file(["upscale_models", "esrgan", "upscale"], upscale_model)
+            if not model_path or not model_path.exists():
+                raise FileNotFoundError(f"未找到超分辨率模型文件: {upscale_model}")
+
+            with Image.open(src_path) as orig_img:
+                orig_w, orig_h = orig_img.size
+
+            if max(orig_w, orig_h) > 4096 and scale > 2:
+                raise ValueError(f"原图分辨率过高 ({orig_w}x{orig_h})，长边超过 4096px 时为防显存溢出仅支持 2x 放大")
+
+            seed_tag = int(time.time())
+            tmp_4x_name = f"tmp_upscale_4x_{seed_tag}_{os.getpid()}.png"
+            tmp_4x_path = OUTPUTS_DIR / tmp_4x_name
+            final_filename = f"upscale_{scale}x_{seed_tag}.png"
+            final_path = OUTPUTS_DIR / final_filename
+
+            cmd = [
+                str(SD_CLI_EXE),
+                "-M", "upscale",
+                "--upscale-model", str(model_path),
+                "-i", str(src_path),
+                "-o", str(tmp_4x_path),
+                "--upscale-tile-size", str(tile_size),
+                "--upscale-repeats", "1",
+            ]
+
+            start_t = time.time()
+            self.current_task = {
+                "source": "web_upscale",
+                "prompt": f"[🔍 {scale}x 超分辨率放大] 原图: {src_path.name}",
+                "width": orig_w * scale,
+                "height": orig_h * scale,
+                "steps": 1,
+                "diff_model": upscale_model,
+                "start_time": start_t,
+                "pct": 0.3,
+                "desc": f"正在进行 {scale}x C++ 硬件加速超分辨率放大...",
+            }
+
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    cwd=str(BASE_DIR),
+                )
+                self.current_cli_proc = proc
+
+                error_lines = []
+                tile_re = re.compile(r'(\d+)/(\d+)')
+                while True:
+                    line_b = await proc.stdout.readline()
+                    if not line_b:
+                        break
+                    line = line_b.decode(errors="replace").strip()
+                    error_lines.append(line)
+
+                    if "loading tensors completed" in line:
+                        self.current_task["pct"] = 0.15
+                        self.current_task["desc"] = "超分模型权重载入完成"
+                    elif "it/s" in line or "s/it" in line:
+                        m = tile_re.search(line)
+                        if m:
+                            cur, total = int(m.group(1)), int(m.group(2))
+                            if total > 0:
+                                pct = 0.15 + 0.75 * (cur / total)
+                                self.current_task["pct"] = round(pct, 2)
+                                self.current_task["desc"] = f"硬件加速分块超分中 ({cur}/{total})"
+                    elif "input_image_tensor upscaled" in line:
+                        self.current_task["pct"] = 0.92
+                        self.current_task["desc"] = "分块超分完成，正在优化画质..."
+
+                ret = await proc.wait()
+                if ret != 0 or not tmp_4x_path.exists():
+                    err_msg = "\n".join(error_lines[-15:]) if error_lines else "引擎未生成目标文件"
+                    raise RuntimeError(f"sd-cli 超分辨率放大失败 (代码 {ret}):\n{err_msg}")
+
+                with Image.open(tmp_4x_path) as img_4x:
+                    w_4x, h_4x = img_4x.size
+                    if scale == 2:
+                        self.current_task["pct"] = 0.95
+                        self.current_task["desc"] = "高质量平滑下采样中..."
+                        target_w = max(1, w_4x // 2)
+                        target_h = max(1, h_4x // 2)
+                        img_2x = img_4x.resize((target_w, target_h), Image.Resampling.LANCZOS)
+                        img_2x.save(final_path, quality=95)
+                        final_w, final_h = target_w, target_h
+                    else:
+                        final_w, final_h = w_4x, h_4x
+
+                if scale != 2:
+                    shutil.move(tmp_4x_path, final_path)
+
+                duration = round(time.time() - start_t, 2)
+                self.current_task["pct"] = 1.0
+                self.current_task["desc"] = "超分放大完成！"
+
+                # 检查输入源图是否已有伴生元数据，若有则完整继承原始生成信息
+                orig_json_path = OUTPUTS_JSON_DIR / f"{src_path.stem}.json"
+                orig_meta = {}
+                if orig_json_path.exists():
+                    try:
+                        with open(orig_json_path, "r", encoding="utf-8") as f:
+                            orig_meta = json.load(f)
+                    except Exception:
+                        pass
+
+                meta = {
+                    "id": final_path.stem,
+                    "filename": final_filename,
+                    "mode": orig_meta.get("mode", f"upscale_{scale}x"),
+                    "source": orig_meta.get("source", "web_upscale"),
+                    "prompt": orig_meta.get("prompt", f"[🔍 {scale}x 超分辨率放大] 原图: {src_path.name}"),
+                    "negative_prompt": orig_meta.get("negative_prompt", ""),
+                    "cfg_scale": orig_meta.get("cfg_scale", 1.0),
+                    "steps": orig_meta.get("steps", 1),
+                    "seed": orig_meta.get("seed", seed_tag),
+                    "diff_model": orig_meta.get("diff_model", ""),
+                    "te_model": orig_meta.get("te_model", ""),
+                    "vae_model": orig_meta.get("vae_model", ""),
+                    "loras": orig_meta.get("loras", []),
+                    "vram_mode": orig_meta.get("vram_mode", self.mode),
+                    "width": final_w,
+                    "height": final_h,
+                    "aspect_ratio": compute_aspect_ratio_str(final_w, final_h),
+                    "duration_seconds": duration,
+                    "created_at": int(time.time()),
+                    "created_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                    "init_image": orig_meta.get("init_image", src_path.name),
+                    "ref_images": orig_meta.get("ref_images", []),
+                    # 专属超分信息
+                    "upscale_model": upscale_model,
+                    "upscale_scale": scale,
+                    "upscaled_from": src_path.name,
+                    "orig_width": orig_w,
+                    "orig_height": orig_h,
+                }
+                try:
+                    OUTPUTS_JSON_DIR.mkdir(parents=True, exist_ok=True)
+                    with open(OUTPUTS_JSON_DIR / f"{final_path.stem}.json", "w", encoding="utf-8") as f:
+                        json.dump(meta, f, indent=2, ensure_ascii=False)
+                except Exception as ex:
+                    print(f"[Warning] 保存超分元数据失败: {ex}")
+
+                return {
+                    "success": True,
+                    "filename": final_filename,
+                    "image_url": f"/outputs/{final_filename}",
+                    "width": final_w,
+                    "height": final_h,
+                    "orig_width": orig_w,
+                    "orig_height": orig_h,
+                    "scale": scale,
+                    "duration": duration,
+                    "metadata": meta,
+                }
+            finally:
+                self.current_cli_proc = None
+                self.current_task = None
+                if tmp_4x_path.exists():
+                    try:
+                        tmp_4x_path.unlink()
+                    except Exception:
+                        pass
 
     async def idle_checker_loop(self):
         while True:

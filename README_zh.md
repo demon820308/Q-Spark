@@ -3,7 +3,7 @@
   <h1>Q-Spark 生图控制台</h1>
   <p><strong>基于 stable-diffusion.cpp C++ 原生引擎的轻量高性能本地 AI 生图工作室，支持兼容 OpenAI 的 Agent API。</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.3</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.4</a> ·
     <a href="#核心功能特性">核心特性</a> ·
     <a href="#快速上手">快速上手</a> ·
     <a href="#模型库与目录规范">模型库指引</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=%E7%89%88%E6%9C%AC" alt="最新版本" /></a>
-    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.3-green" alt="版本 v0.2.3" />
+    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.4-green" alt="版本 v0.2.4" />
     <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/%E5%BA%95%E5%B1%82%E5%BC%95%E6%93%8E-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ 引擎" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/%E5%BC%80%E6%BA%90%E5%8D%8F%E8%AE%AE-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -23,40 +23,38 @@
 
 ## ⚡ 极速推理 · 极致显存 · 全功能创作工作台
 
-| 🚀 秒级极速 · 自由无审查 | 🎨 创作工作台三态合一 | 🔌 智能体与工作流无缝连接 |
+| 🚀 秒级极速 · 自由无审查 | 🎨 创作与超分全链路合一 | 🔌 智能体与工作流无缝连接 |
 | :--- | :--- | :--- |
-| **Qwen-Image-2.1-Turbo** (6~8步极速) 与 **Z-Image Turbo** (8~9步) 原生本地推理，纯 C++ 底层 GGML/CUDA 架构，主流游戏显卡（RTX 3060 / 3080 / 4060 等 8~10G 卡）流畅运行。 | 单一交互工作台完美融合**文生图 (txt2img)** 与 **多模态图像指令编辑 (Image Edit)**，极简高效，参数无缝流转。 | 完整兼容 OpenAI 标准 `/v1/images/generations` HTTP API，支持智能比例解析，完美打通 Dify、Cherry Studio、Chatbox 等 AI 智能体生态。 |
+| **Qwen-Image-2.1-Turbo** 与 **Z-Image Turbo** 原生本地推理，纯 C++ 底层 GGML/CUDA 架构，主流游戏显卡（8~10G 卡）极速流畅运行。 | 融合**文生图**、**指令编辑**与 **C++ 硬件加速高清超分放大 (2x/4x)**，内置切块进度检测与无损大图拖拽漫游。 | 完整兼容 OpenAI 标准 `/v1/images/generations` HTTP API，完美打通 Dify、Cherry Studio、Chatbox 等 AI 智能体生态。 |
 
 本地工作流 100% 在您自己的硬件上运行。零数据外发、零云端依赖、隐私安全。
 
 ---
 
-## 🌟 v0.2.3 核心功能特性
+## 🌟 v0.2.4 核心功能特性
 
-### 1. 🖥️ 原生桌面守护宿主与系统托盘 (`Q-Spark.exe`)
+### 1. 🔍 硬件加速图像超分辨率放大 (C++ Upscale Engine)
+- **原生 C++ 切块超分**：集成 `stable-diffusion.cpp -M upscale` 引擎，支持 2x 细腻平滑保真超分与 4x 极致超分辨率，1~2 秒内输出超清大图。
+- **开箱内置首选模型**：便携版开箱内置最优超分模型 `4x-UltraSharp.pth`（约 64MB），开箱即用；支持在 `models/upscale_models` 放入任意第三方超分模型，界面自动识别列出。
+- **分块切块 (Tile) 推理实时进度指示**：毫秒级解析底层控制台切块计数（如 `2/9`），独立超分工作区与画廊弹窗均配备动态进度条与运行状态指示。
+
+### 2. 🖼️ 历史画廊全链路超分闭环与元数据继承
+- **画廊弹窗一键放大**：画廊详情中直接提供 2x / 4x 放大入口，并配备紧凑的放大模型选择下拉框，两端模型切换双向实时同步。
+- **完美继承原始生成参数**：超分图片完整保留源图的 Prompt、负向词、种子、步数、CFG、模型架构与挂载 LoRA，仅追加放大模型与放大倍数，画廊卡片支持“🔍 图像超分放大”标签与筛选。
+
+### 3. 🖥️ 沉浸式全屏原图查看器 (1:1 拖拽漫游)
+- **彻底根治 Flexbox 居中滚动截断**：应用标准 CSS `margin: auto`，超大图展开 1:1 时左上角自动吸附起点，向右下自然溢出，保证 100% 滚到整张图片的每一个角落。
+- **鼠标左键抓手拖拽平移 (Drag-to-Pan)**：在 1:1 模式下直接按住鼠标左键即可平移漫游，单击图片快速适应屏幕，提供流畅顺滑的专业看图体验。
+
+### 4. 🖥️ 原生桌面守护宿主与系统托盘 (`Q-Spark.exe`)
 - **沉浸式暗色宿主视窗**：纯原生组件构建的高颜值桌面监控宿主视窗，彻底告别简陋黑框命令行终端。
-- **Windows JobObject 操作系统级进程树护航**：内核级绑定所有子进程（Python 服务、C++ 推理后端），退出完全回收，严防任何僵尸进程与端口残留。
-- **纯净独立浏览器隔离**：专有 Edge Profile 隔离机制，彻底消除与本地系统日常 Edge 浏览器的单例锁冲突，开箱即用稳定长驻。
+- **Windows JobObject 进程树护航**：内核级绑定所有子进程（Python 服务、C++ 推理后端），退出完全回收，严防任何僵尸进程与端口残留。
+- **微信/网易云级托盘无缝交互**：点击最小化（`—`）或关闭（`×`）秒进系统托盘，后台服务平稳常驻保障外部 Agent 接口不中断；双击图标秒级唤醒。
 
-### 2. 🛸 微信/网易云级托盘无缝交互
-- **极速托盘收缩**：点击最小化（`—`）或关闭（`×`）秒进右下角系统托盘，毫秒级隐藏，零延迟、零卡顿。
-- **后台服务不中断**：视窗收缩托盘后后台生图模型与 API 服务平稳常驻，保障外部 AI Agent 连续画图作业不中断。
-- **秒级唤醒与彻底退出**：双击托盘图标即刻恢复窗口，状态完整保留；提供顶部状态栏与托盘菜单双重【🛑 退出程序】入口。
-
-### 3. 🤖 外部 Agent 接入实时监控看板
+### 5. 🤖 外部 Agent 接入实时监控看板
 - **实时调用流监控**：即时捕获外部 Agent（Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code 等）的生图请求、模型参数与耗时。
 - **提示词长文本自适应展开**：提示词卡片动态撑开多行，配备暗色极简微型滚动条，支持鼠标任意划选复制。
 - **零刷屏按需轮询开关**：内置现代几何暗色科技风 ON/OFF 滑动开关，默认完全静默（0 接口请求不刷屏控制台），支持按需开启长轮询或单次 `[⟳ 刷新]`。
-
-### 4. ⚙️ 模型与配置双向热同步
-- 桌面宿主与 Web 端实时双向同步 `config.json`。
-- 主生图模型、文本编码器（TE）、VAE 与默认步数支持界面化热配置并自动成套联动纠偏。
-
-### 5. 🎨 创作工作台多模态进阶
-- **文生图 (txt2img)**：零底图纯文本极速出图，模型特征步数自适应。
-- **图像指令编辑 (Image Edit)**：纯净空噪声起步编辑模式，遵循自然语言指令修改。
-- **多图参考与视觉 Token 智能映射**：支持最多 3 张参考图，自动识别“图1”、“图2”映射为 Qwen 原生视觉 Token `<image1>` / `<image2>`。
-- **实时任务中断 (⏹️ 停止任务)**：毫秒级杀灭底层生成子进程，即刻释放 GPU 显存。
 
 ---
 
@@ -66,7 +64,7 @@
 
 无需安装 Python，无需配置环境或下载 pip 依赖包，解压即用！
 
-1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.3-windows-x64-portable.zip`**；
+1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.4-windows-x64-portable.zip`**；
 2. 解压到电脑上的任意文件夹；
 3. 将下载好的模型放入 `models/` 对应子目录中（详见下方 [模型库与目录规范](#模型库与目录规范)）；
 4. 双击运行 **`start.bat`**（或 `Q-Spark.exe`）；

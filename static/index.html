@@ -17,11 +17,12 @@
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
             <button class="nav-tab" id="open-doc-btn" style="background: var(--bg-subcard); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 10px; color: var(--text-title); font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="查看模型下载说明文档与配置指南">
-                📖 模型下载说明文档
+                📖 说明文档
             </button>
             <div class="header-nav-tabs">
-                <button class="nav-tab active" id="tab-create-btn">🎨 图像创作 (Create)</button>
-                <button class="nav-tab" id="tab-gallery-btn">🖼️ 历史画廊 (Gallery)</button>
+                <button class="nav-tab active" id="tab-create-btn">🎨 图像创作</button>
+                <button class="nav-tab" id="tab-upscale-btn">🔍 图像放大</button>
+                <button class="nav-tab" id="tab-gallery-btn">🖼️ 历史画廊</button>
             </div>
         </div>
         <div class="header-actions">
@@ -286,6 +287,125 @@
     </footer>
     </div> <!-- /#view-create -->
 
+    <!-- 图像超分放大主视图 (独立区域) -->
+    <div id="view-upscale" style="display: none;">
+        <div class="workspace-grid">
+            <!-- 左侧：待放大图片上传与参数 -->
+            <div class="card">
+                <div style="font-size: 1.05rem; font-weight: 600; color: var(--text-title); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>📥 待放大图片上传</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">C++ 硬件加速超分辨率</span>
+                </div>
+
+                <!-- 拖拽上传区 -->
+                <div id="upscale-dropzone" class="dropzone-box" style="margin-bottom: 14px; min-height: 140px;">
+                    <input type="file" id="upscale-file-input" accept="image/*" style="display: none;">
+                    <div class="dropzone-hint">
+                        <span style="font-size: 2rem;">📥</span>
+                        <div style="font-size: 0.88rem; color: var(--text-primary); margin-top: 6px; font-weight: 500;">点击上传或拖拽图片到此处</div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">支持 PNG / JPG / WEBP · 支持直接使用 Ctrl+V 粘贴截图</div>
+                    </div>
+                </div>
+
+                <!-- 已上传底图的预览与信息 -->
+                <div id="upscale-preview-box" class="init-preview-container" style="display: none; margin-bottom: 16px;">
+                    <div class="init-thumb-wrapper">
+                        <img id="upscale-src-img" src="" alt="原图预览">
+                        <div id="upscale-src-size" class="init-size-badge">-- x --</div>
+                    </div>
+                    <div class="init-controls" style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.84rem; font-weight: 600; color: var(--text-title);">原图已载入</span>
+                            <button type="button" id="upscale-clear-btn" class="btn-secondary" style="padding: 2px 8px; font-size: 0.76rem; color: #ff6b6b;">✕ 重新选择</button>
+                        </div>
+                        <div id="upscale-src-info" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; line-height: 1.45;">
+                            等待选择放大参数...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 参数设置 -->
+                <div class="form-group">
+                    <label for="upscale-model-select">超分模型 (ESRGAN 架构)</label>
+                    <select id="upscale-model-select" style="width: 100%;"></select>
+                    <div id="upscale-model-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                        模型存放于 <code>models/upscale_models/</code>（直接支持 ComfyUI 同名目录）
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>放大倍数</label>
+                    <div style="display: flex; gap: 12px; margin-top: 6px;">
+                        <label style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--bg-subcard); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; cursor: pointer;">
+                            <input type="radio" name="upscale-scale-val" value="2" checked>
+                            <span style="font-weight: 600; font-size: 0.88rem;">2x (2K 高清)</span>
+                        </label>
+                        <label style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--bg-subcard); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; cursor: pointer;">
+                            <input type="radio" name="upscale-scale-val" value="4">
+                            <span style="font-weight: 600; font-size: 0.88rem;">4x (4K 超清)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="upscale-target-info" style="font-size: 0.82rem; color: var(--primary); margin-bottom: 16px; background: rgba(204,120,92,0.1); border: 1px solid rgba(204,120,92,0.25); border-radius: 8px; padding: 8px 12px;">
+                    预计输出尺寸: 等待上传图片
+                </div>
+
+                <button class="btn-coral" id="upscale-btn" style="width: 100%; padding: 10px; font-size: 0.92rem;">
+                    ⚡ 开始高清超分 (Upscale)
+                </button>
+            </div>
+
+            <!-- 右侧：超分结果画布 -->
+            <div class="card" style="display: flex; flex-direction: column;">
+                <div style="font-size: 1.05rem; font-weight: 600; color: var(--text-title); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>🖼️ 高清超分结果</span>
+                    <span id="upscale-res-badge" class="init-size-badge" style="display: none;">--</span>
+                </div>
+
+                <!-- 占位空态 -->
+                <div id="upscale-empty-state" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; background: var(--bg-subcard); border: 1px dashed var(--border-color); border-radius: 10px; color: var(--text-muted); text-align: center; padding: 20px;">
+                    <span style="font-size: 2.5rem; margin-bottom: 10px;">🔍</span>
+                    <div style="font-size: 0.92rem; font-weight: 500; color: var(--text-primary);">暂未进行超分处理</div>
+                    <div style="font-size: 0.80rem; margin-top: 6px; max-width: 320px;">在左侧上传或粘贴图片，选择 2x/4x 倍数后点击开始，C++ 引擎将在 1~2 秒内输出超清大图</div>
+                </div>
+
+                <!-- 放大中加载态 -->
+                <div id="upscale-loading-state" style="display: none; flex: 1; flex-direction: column; align-items: center; justify-content: center; min-height: 380px; background: var(--bg-subcard); border-radius: 10px; padding: 24px;">
+                    <div style="width: 36px; height: 36px; border: 3px solid rgba(204,120,92,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                    <div style="margin-top: 14px; font-weight: 500; font-size: 0.9rem; color: var(--text-primary);" id="upscale-loading-text">正在进行硬件加速超分运算...</div>
+                    <div class="gen-progress-wrapper active" id="upscale-progress-wrapper" style="width: 100%; max-width: 340px; margin-top: 14px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span id="upscale-progress-desc" style="font-size: 0.82rem; color: var(--text-muted);">准备中...</span>
+                            <span id="upscale-progress-pct" class="metric-val" style="font-size: 0.82rem;">0%</span>
+                        </div>
+                        <div class="gen-progress-bar-bg">
+                            <div class="gen-progress-bar-fill" id="upscale-progress-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 结果展示 -->
+                <div id="upscale-result-box" style="display: none; flex: 1; flex-direction: column; gap: 12px;">
+                    <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #0a0a0a; border-radius: 10px; overflow: hidden; min-height: 380px; max-height: 560px;">
+                        <img id="upscale-res-img" src="" alt="超分结果" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <a id="upscale-res-download" href="" download class="btn-coral" style="flex: 1; text-align: center; text-decoration: none; padding: 8px 12px; font-size: 0.84rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            💾 下载高清大图
+                        </a>
+                        <button type="button" class="btn-secondary" id="upscale-res-view-btn" style="padding: 8px 14px; font-size: 0.84rem;">
+                            🔍 全屏查看
+                        </button>
+                        <button type="button" class="btn-secondary" id="upscale-res-gallery-btn" style="padding: 8px 14px; font-size: 0.84rem;">
+                            🖼️ 前往画廊
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- /#view-upscale -->
+
     <!-- 历史画廊主视图 -->
     <div id="view-gallery" style="display: none;">
         <div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px; padding: 14px 20px;">
@@ -296,6 +416,7 @@
                     <option value="web">Web 页面创作</option>
                     <option value="api_dalle">OpenAI DALL-E API</option>
                     <option value="api_chat">Agent 对话流 API</option>
+                    <option value="web_upscale">🔍 图像超分放大</option>
                 </select>
                 <button class="btn-secondary" id="gallery-refresh-btn" style="padding: 6px 14px;">🔄 刷新画廊</button>
             </div>
@@ -363,6 +484,10 @@
                         <strong style="font-size: 0.85rem;">挂载 LoRA：</strong>
                         <div id="modal-loras" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
                     </div>
+                    <div id="modal-upscale-row" style="display: none; margin-top: 8px;">
+                        <strong style="font-size: 0.85rem;">超分放大：</strong>
+                        <div id="modal-upscale-info" style="font-size: 0.82rem; color: #34d399; font-weight: 500; margin-top: 3px; background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.25); border-radius: 6px; padding: 4px 8px;"></div>
+                    </div>
                     <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
                         <div style="display: flex; gap: 8px;">
                             <button class="btn-coral" id="modal-reuse-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">参数重绘</button>
@@ -371,6 +496,23 @@
                         <div style="display: flex; gap: 8px;">
                             <button class="btn-secondary" id="modal-copy-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">复制提示词</button>
                             <a id="modal-dl-btn" href="" download class="btn-secondary" style="flex: 1; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">下载</a>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <span style="font-size: 0.80rem; color: var(--text-muted); white-space: nowrap;">放大模型:</span>
+                            <select id="modal-upscale-model-select" style="flex: 1; padding: 5px 8px; font-size: 0.80rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary);"></select>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-secondary" id="modal-upscale-2x-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">🔍 2x 放大</button>
+                            <button class="btn-secondary" id="modal-upscale-4x-btn" style="flex: 1; white-space: nowrap; padding: 8px 6px; font-size: 0.84rem;">🔍 4x 放大</button>
+                        </div>
+                        <div id="modal-upscale-progress-wrap" style="display: none; margin-top: 4px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px; color: var(--text-muted);">
+                                <span id="modal-upscale-desc">切块超分中...</span>
+                                <span id="modal-upscale-pct" style="color: var(--primary);">0%</span>
+                            </div>
+                            <div class="gen-progress-bar-bg" style="height: 6px;">
+                                <div class="gen-progress-bar-fill" id="modal-upscale-bar" style="width: 0%;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -481,6 +623,25 @@
             return newLines.join('\n');
         }
 
+        // 硬件与任务监控轮询
+        let activeUpscaleCallback = null;
+        let upscalePollTimer = null;
+
+        function startUpscaleProgressPolling(cb) {
+            activeUpscaleCallback = cb;
+            if (upscalePollTimer) clearInterval(upscalePollTimer);
+            fetchMetrics();
+            upscalePollTimer = setInterval(fetchMetrics, 300);
+        }
+
+        function stopUpscaleProgressPolling() {
+            if (upscalePollTimer) {
+                clearInterval(upscalePollTimer);
+                upscalePollTimer = null;
+            }
+            activeUpscaleCallback = null;
+        }
+
         // 采集系统硬件指标
         async function fetchMetrics() {
             try {
@@ -508,6 +669,11 @@
                 const cBar = document.getElementById('metric-cpu-bar');
                 cBar.style.width = `${Math.min(100, cpu.pct)}%`;
                 cBar.className = 'metric-progress-bar ' + (cpu.pct >= 88 ? 'bar-danger' : cpu.pct >= 75 ? 'bar-warn' : 'bar-normal');
+
+                // 实时推送超分任务进度
+                if (activeUpscaleCallback && m.active_task) {
+                    activeUpscaleCallback(m.active_task);
+                }
             } catch (e) {}
         }
 
@@ -582,6 +748,7 @@
                 populateSelect('te-select', data.te_choices, data.config.api_te_model);
                 populateSelect('vae-select', data.vae_choices, data.config.api_vae_model);
                 populateSelect('lora-select', data.lora_choices, '');
+                populateSelect('upscale-model-select', data.upscale_choices, '');
 
                 // 显存策略
                 const policy = data.engine_mode || 'on_demand';
@@ -599,6 +766,15 @@
             const sel = document.getElementById(id);
             if (!sel) return;
             sel.innerHTML = '';
+            if (id === 'upscale-model-select' || id === 'modal-upscale-model-select') {
+                if (!choices || choices.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.text = '⚠️ (未检测到超分模型，请放入 models/upscale_models)';
+                    sel.appendChild(opt);
+                    return;
+                }
+            }
             if (id === 'lora-select') {
                 const defaultOpt = document.createElement('option');
                 defaultOpt.value = '';
@@ -627,7 +803,21 @@
                 sel.appendChild(opt);
             });
             if (!sel.value && choices.length > 0) sel.value = choices[0];
+
+            if (id === 'upscale-model-select') {
+                populateSelect('modal-upscale-model-select', choices, sel.value || selectedVal);
+            }
         }
+
+        // 超分工作区与画廊详情弹窗的模型选择双向实时同步
+        document.getElementById('modal-upscale-model-select')?.addEventListener('change', (e) => {
+            const mainSel = document.getElementById('upscale-model-select');
+            if (mainSel) mainSel.value = e.target.value;
+        });
+        document.getElementById('upscale-model-select')?.addEventListener('change', (e) => {
+            const modalSel = document.getElementById('modal-upscale-model-select');
+            if (modalSel) modalSel.value = e.target.value;
+        });
 
         function updateStepsSuggestion() {
             const diffM = (document.getElementById('diff-select')?.value || '').toLowerCase();
@@ -714,6 +904,7 @@
                 populateSelect('te-select', data.te_choices);
                 populateSelect('vae-select', data.vae_choices);
                 populateSelect('lora-select', data.lora_choices, '');
+                populateSelect('upscale-model-select', data.upscale_choices, '');
                 updateStepsSuggestion();
                 alert(data.message);
             } catch (err) {
@@ -755,6 +946,7 @@
                 populateSelect('te-select', data.te_choices);
                 populateSelect('vae-select', data.vae_choices);
                 populateSelect('lora-select', data.lora_choices, '');
+                populateSelect('upscale-model-select', data.upscale_choices, '');
                 updateStepsSuggestion();
                 alert("✅ 已成功添加并切换至新模型库！\n" + data.message);
             } catch (err) {
@@ -788,6 +980,7 @@
                 populateSelect('te-select', data.te_choices);
                 populateSelect('vae-select', data.vae_choices);
                 populateSelect('lora-select', data.lora_choices, '');
+                populateSelect('upscale-model-select', data.upscale_choices, '');
                 updateStepsSuggestion();
                 alert(data.message);
             } catch (err) {
@@ -1109,26 +1302,26 @@
 
         // Tab 切换逻辑
         const tabCreateBtn = document.getElementById('tab-create-btn');
+        const tabUpscaleBtn = document.getElementById('tab-upscale-btn');
         const tabGalleryBtn = document.getElementById('tab-gallery-btn');
         const viewCreate = document.getElementById('view-create');
+        const viewUpscale = document.getElementById('view-upscale');
         const viewGallery = document.getElementById('view-gallery');
 
         function switchTab(tab) {
-            if (tab === 'gallery') {
-                tabCreateBtn.classList.remove('active');
-                tabGalleryBtn.classList.add('active');
-                viewCreate.style.display = 'none';
-                viewGallery.style.display = 'block';
-                fetchGallery(1);
-            } else {
-                tabGalleryBtn.classList.remove('active');
-                tabCreateBtn.classList.add('active');
-                viewGallery.style.display = 'none';
-                viewCreate.style.display = 'block';
-            }
+            tabCreateBtn?.classList.toggle('active', tab === 'create');
+            tabUpscaleBtn?.classList.toggle('active', tab === 'upscale');
+            tabGalleryBtn?.classList.toggle('active', tab === 'gallery');
+
+            if (viewCreate) viewCreate.style.display = (tab === 'create') ? 'block' : 'none';
+            if (viewUpscale) viewUpscale.style.display = (tab === 'upscale') ? 'block' : 'none';
+            if (viewGallery) viewGallery.style.display = (tab === 'gallery') ? 'block' : 'none';
+
+            if (tab === 'gallery') fetchGallery(1);
         }
-        tabCreateBtn.addEventListener('click', () => switchTab('create'));
-        tabGalleryBtn.addEventListener('click', () => switchTab('gallery'));
+        tabCreateBtn?.addEventListener('click', () => switchTab('create'));
+        tabUpscaleBtn?.addEventListener('click', () => switchTab('upscale'));
+        tabGalleryBtn?.addEventListener('click', () => switchTab('gallery'));
 
         // 创作模式切换: 文生图 (txt2img) vs 图像编辑 (edit)
         let currentStudioMode = 'txt2img';
@@ -1273,11 +1466,13 @@
             emptyBox.style.display = 'none';
 
             grid.innerHTML = currentGalleryItems.map((item, idx) => {
-                const sourceLabel = item.source === 'web' ? 'Web 页面' : item.source === 'api_dalle' ? 'DALL-E API' : 'Agent 对话';
-                const sourceClass = item.source === 'web' ? 'source-web' : 'source-api';
+                const isUpscale = Boolean(item.upscale_scale || item.source === 'web_upscale');
+                const sourceLabel = item.mode === 'edit' ? '指令编辑' : item.source === 'web' ? 'Web 页面' : item.source === 'api_dalle' ? 'DALL-E API' : isUpscale ? '超分放大' : 'Agent 对话';
+                const sourceClass = (item.source === 'web' || isUpscale) ? 'source-web' : 'source-api';
                 const costStr = item.duration_seconds ? `${item.duration_seconds}s` : '--';
                 const cfgStr = item.cfg_scale !== undefined ? `CFG ${item.cfg_scale}` : '';
                 const loraBadge = (item.loras && item.loras.length > 0) ? `<span class="gallery-tag" style="color: #c084fc;">🏷️ LoRA x${item.loras.length}</span>` : '';
+                const upscaleBadge = item.upscale_scale ? `<span class="gallery-tag" style="color: #34d399; border-color: rgba(52,211,153,0.35);">🔍 ${item.upscale_scale}x 放大</span>` : '';
                 const safePrompt = escapeHtml(item.prompt || '');
                 const timeStr = item.created_time || '';
                 const ratioStr = formatAspectRatio(item.width, item.height, item.aspect_ratio);
@@ -1294,6 +1489,7 @@
                             <div class="gallery-meta-tags">
                                 <span class="gallery-tag ${sourceClass}">${sourceLabel}</span>
                                 ${modeTag}
+                                ${upscaleBadge}
                                 <span class="gallery-tag">⚡ ${item.steps}步</span>
                                 <span class="gallery-tag">⏳ ${costStr}</span>
                                 <span class="gallery-tag">📐 ${ratioStr}</span>
@@ -1341,6 +1537,11 @@
                 sourceEl.className = 'gallery-tag';
                 sourceEl.style.color = '#60a5fa';
                 sourceEl.style.borderColor = 'rgba(96,165,250,0.4)';
+            } else if (item.source === 'web_upscale' || item.upscale_scale) {
+                sourceEl.innerText = `🔍 超分放大 (${item.upscale_scale || 2}x)`;
+                sourceEl.className = 'gallery-tag';
+                sourceEl.style.color = '#34d399';
+                sourceEl.style.borderColor = 'rgba(52,211,153,0.4)';
             } else if (item.source === 'web') {
                 sourceEl.innerText = '🏷️ Web 页面创作';
                 sourceEl.className = 'gallery-tag source-web';
@@ -1375,6 +1576,20 @@
                 loraRow.style.display = 'none';
             }
 
+            const upscaleRow = document.getElementById('modal-upscale-row');
+            const upscaleInfo = document.getElementById('modal-upscale-info');
+            if (upscaleRow && upscaleInfo) {
+                if (item.upscale_scale) {
+                    upscaleRow.style.display = 'block';
+                    const origDim = (item.orig_width && item.orig_height) ? ` (原图: ${item.orig_width}×${item.orig_height})` : '';
+                    upscaleInfo.innerText = `${item.upscale_model || '超分模型'} · ${item.upscale_scale}x 放大${origDim}`;
+                } else {
+                    upscaleRow.style.display = 'none';
+                }
+            }
+            const modalProgressWrap = document.getElementById('modal-upscale-progress-wrap');
+            if (modalProgressWrap) modalProgressWrap.style.display = 'none';
+
             document.getElementById('modal-dl-btn').href = item.image_url;
             document.getElementById('modal-dl-btn').setAttribute('download', item.filename);
 
@@ -1390,10 +1605,17 @@
             const fs = document.getElementById('fullscreen-viewer');
             const fsImg = document.getElementById('fs-viewer-img');
             const fsTitle = document.getElementById('fs-viewer-title');
+            const fsViewport = document.getElementById('fs-viewport');
             const ratioStr = formatAspectRatio(item.width, item.height, item.aspect_ratio);
             fsTitle.innerText = `原图档案：${item.width} × ${item.height} (${ratioStr}) - ${item.filename}`;
             fsImg.src = item.image_url;
             fsImg.className = 'fit-screen';
+            if (fsViewport) {
+                fsViewport.scrollLeft = 0;
+                fsViewport.scrollTop = 0;
+            }
+            const toggleBtn = document.getElementById('fs-zoom-toggle-btn');
+            if (toggleBtn) toggleBtn.innerText = '🔍 切换 1:1 / 适应屏幕';
             fs.classList.add('active');
         }
 
@@ -1404,22 +1626,73 @@
 
         function toggleFullscreenZoom() {
             const fsImg = document.getElementById('fs-viewer-img');
+            const toggleBtn = document.getElementById('fs-zoom-toggle-btn');
             if (!fsImg) return;
             if (fsImg.classList.contains('fit-screen')) {
                 fsImg.className = 'actual-size';
+                if (toggleBtn) toggleBtn.innerText = '🔍 适应屏幕 (当前 1:1)';
             } else {
                 fsImg.className = 'fit-screen';
+                if (toggleBtn) toggleBtn.innerText = '🔍 切换 1:1 (当前适应)';
+                const fsViewport = document.getElementById('fs-viewport');
+                if (fsViewport) {
+                    fsViewport.scrollLeft = 0;
+                    fsViewport.scrollTop = 0;
+                }
             }
         }
+
+        // 大图模式下鼠标抓手拖拽平移 (Drag-to-Pan)
+        let isFsPanning = false;
+        let fsPanStartX = 0;
+        let fsPanStartY = 0;
+        let fsPanStartScrollLeft = 0;
+        let fsPanStartScrollTop = 0;
+        let fsHasMoved = false;
+
+        const fsViewport = document.getElementById('fs-viewport');
+        const fsImgEl = document.getElementById('fs-viewer-img');
+
+        fsViewport?.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            if (!fsImgEl.classList.contains('actual-size')) return;
+            isFsPanning = true;
+            fsHasMoved = false;
+            fsPanStartX = e.clientX;
+            fsPanStartY = e.clientY;
+            fsPanStartScrollLeft = fsViewport.scrollLeft;
+            fsPanStartScrollTop = fsViewport.scrollTop;
+            fsViewport.classList.add('is-dragging');
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isFsPanning) return;
+            const dx = e.clientX - fsPanStartX;
+            const dy = e.clientY - fsPanStartY;
+            if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                fsHasMoved = true;
+            }
+            fsViewport.scrollLeft = fsPanStartScrollLeft - dx;
+            fsViewport.scrollTop = fsPanStartScrollTop - dy;
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isFsPanning) {
+                isFsPanning = false;
+                fsViewport?.classList.remove('is-dragging');
+            }
+        });
 
         document.getElementById('fs-close-btn').addEventListener('click', closeFullscreenViewer);
         document.getElementById('fs-zoom-toggle-btn').addEventListener('click', toggleFullscreenZoom);
         document.getElementById('fs-viewer-img').addEventListener('click', (e) => {
             e.stopPropagation();
+            if (fsHasMoved) return;
             toggleFullscreenZoom();
         });
         document.getElementById('fs-viewport').addEventListener('click', (e) => {
             if (e.target.id === 'fs-viewport') {
+                if (fsHasMoved) return;
                 closeFullscreenViewer();
             }
         });
@@ -1744,10 +2017,15 @@
                 for (let item of e.clipboardData.items) {
                     if (item.type.indexOf('image') !== -1) {
                         const blob = item.getAsFile();
-                        handleMultipleFiles([blob]);
-                        switchStudioMode('edit');
-                        switchTab('create');
-                        showAlert("已自动将剪贴板中的截图载入为参考图！", "垫图成功");
+                        if (viewUpscale && viewUpscale.style.display !== 'none') {
+                            processImageFile(blob, (dataUrl) => setUpscaleSource(dataUrl));
+                            showAlert("已自动将剪贴板中的截图载入为待放大图片！", "载入成功");
+                        } else {
+                            handleMultipleFiles([blob]);
+                            switchStudioMode('edit');
+                            switchTab('create');
+                            showAlert("已自动将剪贴板中的截图载入为参考图！", "垫图成功");
+                        }
                         break;
                     }
                 }
@@ -1803,6 +2081,294 @@
         document.getElementById('gallery-next-btn').addEventListener('click', () => {
             fetchGallery(galleryPage + 1);
         });
+
+        // ==========================================
+        // 图像放大 (Upscale) 独立工作区交互
+        // ==========================================
+        let currentUpscaleSrc = null;
+        let upscaleSrcNaturalW = 0;
+        let upscaleSrcNaturalH = 0;
+
+        function updateUpscaleTargetInfo() {
+            const infoEl = document.getElementById('upscale-target-info');
+            if (!infoEl) return;
+            const scale = parseInt(document.querySelector('input[name="upscale-scale-val"]:checked')?.value || '2');
+            if (!upscaleSrcNaturalW || !upscaleSrcNaturalH) {
+                infoEl.innerText = `预计输出尺寸: 等待上传图片 (${scale}x)`;
+                return;
+            }
+            const tw = upscaleSrcNaturalW * scale;
+            const th = upscaleSrcNaturalH * scale;
+            infoEl.innerText = `预计输出尺寸: ${upscaleSrcNaturalW}x${upscaleSrcNaturalH} ➔ ${tw}x${th} (${scale}x 高清超分辨率)`;
+        }
+
+        function setUpscaleSource(src, natW = 0, natH = 0) {
+            currentUpscaleSrc = src;
+            const imgEl = document.getElementById('upscale-src-img');
+            const dropzone = document.getElementById('upscale-dropzone');
+            const previewBox = document.getElementById('upscale-preview-box');
+            const sizeBadge = document.getElementById('upscale-src-size');
+            const infoText = document.getElementById('upscale-src-info');
+
+            if (!src) {
+                clearUpscaleSource();
+                return;
+            }
+
+            imgEl.src = src;
+            if (dropzone) dropzone.style.display = 'none';
+            if (previewBox) previewBox.style.display = 'flex';
+
+            const onLoaded = (w, h) => {
+                upscaleSrcNaturalW = w;
+                upscaleSrcNaturalH = h;
+                if (sizeBadge) sizeBadge.innerText = `${w} x ${h}`;
+                if (infoText) infoText.innerText = `原图尺寸: ${w}x${h} · 像素总量 ${(w * h / 1000000).toFixed(2)} MP`;
+                updateUpscaleTargetInfo();
+            };
+
+            if (natW && natH) {
+                onLoaded(natW, natH);
+            } else {
+                imgEl.onload = () => onLoaded(imgEl.naturalWidth, imgEl.naturalHeight);
+            }
+        }
+
+        function clearUpscaleSource() {
+            currentUpscaleSrc = null;
+            upscaleSrcNaturalW = 0;
+            upscaleSrcNaturalH = 0;
+            const imgEl = document.getElementById('upscale-src-img');
+            if (imgEl) imgEl.src = '';
+            const dropzone = document.getElementById('upscale-dropzone');
+            if (dropzone) dropzone.style.display = 'block';
+            const previewBox = document.getElementById('upscale-preview-box');
+            if (previewBox) previewBox.style.display = 'none';
+            const fileInput = document.getElementById('upscale-file-input');
+            if (fileInput) fileInput.value = '';
+            updateUpscaleTargetInfo();
+        }
+
+        document.querySelectorAll('input[name="upscale-scale-val"]').forEach(radio => {
+            radio.addEventListener('change', updateUpscaleTargetInfo);
+        });
+
+        const upscaleDropzone = document.getElementById('upscale-dropzone');
+        const upscaleFileInput = document.getElementById('upscale-file-input');
+
+        upscaleDropzone?.addEventListener('click', () => upscaleFileInput?.click());
+        upscaleFileInput?.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                processImageFile(e.target.files[0], (dataUrl) => setUpscaleSource(dataUrl));
+            }
+        });
+
+        upscaleDropzone?.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            upscaleDropzone.classList.add('dragover');
+        });
+        upscaleDropzone?.addEventListener('dragleave', () => upscaleDropzone?.classList.remove('dragover'));
+        upscaleDropzone?.addEventListener('drop', (e) => {
+            e.preventDefault();
+            upscaleDropzone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processImageFile(e.dataTransfer.files[0], (dataUrl) => setUpscaleSource(dataUrl));
+            }
+        });
+
+        document.getElementById('upscale-clear-btn')?.addEventListener('click', clearUpscaleSource);
+
+        document.getElementById('upscale-btn')?.addEventListener('click', async () => {
+            if (!currentUpscaleSrc) {
+                showAlert("请先上传或粘贴需要放大的图片", "缺少原图");
+                return;
+            }
+            const modelSelect = document.getElementById('upscale-model-select');
+            const model = modelSelect?.value;
+            if (!model) {
+                showAlert("未检测到可用的超分辨率模型，请将 4x-UltraSharp.pth 放入 models/upscale_models/ 目录中", "缺少模型");
+                return;
+            }
+            const scale = parseInt(document.querySelector('input[name="upscale-scale-val"]:checked')?.value || '2');
+
+            const btn = document.getElementById('upscale-btn');
+            const emptyState = document.getElementById('upscale-empty-state');
+            const loadingState = document.getElementById('upscale-loading-state');
+            const resultBox = document.getElementById('upscale-result-box');
+            const descEl = document.getElementById('upscale-progress-desc');
+            const pctEl = document.getElementById('upscale-progress-pct');
+            const fillEl = document.getElementById('upscale-progress-fill');
+            const textEl = document.getElementById('upscale-loading-text');
+
+            btn.disabled = true;
+            btn.innerText = "⏳ 正在硬件加速超分运算中...";
+            if (emptyState) emptyState.style.display = 'none';
+            if (resultBox) resultBox.style.display = 'none';
+            if (loadingState) loadingState.style.display = 'flex';
+            if (descEl) descEl.innerText = "准备超分模型权重...";
+            if (pctEl) pctEl.innerText = "0%";
+            if (fillEl) fillEl.style.width = "0%";
+            if (textEl) textEl.innerText = "正在进行硬件加速超分运算...";
+
+            startUpscaleProgressPolling((task) => {
+                if (task) {
+                    const pctVal = Math.round((task.pct || 0) * 100);
+                    if (descEl) descEl.innerText = task.desc || '分块超分计算中...';
+                    if (pctEl) pctEl.innerText = `${pctVal}%`;
+                    if (fillEl) fillEl.style.width = `${pctVal}%`;
+                    if (textEl && task.desc) textEl.innerText = task.desc;
+                    btn.innerText = `⏳ 超分中 (${pctVal}%)`;
+                }
+            });
+
+            try {
+                const resp = await fetch('/api/upscale', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: currentUpscaleSrc,
+                        upscale_model: model,
+                        scale: scale,
+                    })
+                });
+                const res = await resp.json();
+                if (!resp.ok || !res.success) {
+                    throw new Error(res.detail || "超分任务失败");
+                }
+
+                if (loadingState) loadingState.style.display = 'none';
+                if (resultBox) resultBox.style.display = 'flex';
+
+                const resImg = document.getElementById('upscale-res-img');
+                if (resImg) resImg.src = res.image_url;
+                const dlBtn = document.getElementById('upscale-res-download');
+                if (dlBtn) {
+                    dlBtn.href = res.image_url;
+                    dlBtn.download = res.filename;
+                }
+
+                const badge = document.getElementById('upscale-res-badge');
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.innerText = `${res.width}x${res.height} · 耗时 ${res.duration}s (${res.scale}x)`;
+                }
+            } catch (err) {
+                if (loadingState) loadingState.style.display = 'none';
+                if (emptyState) emptyState.style.display = 'flex';
+                showAlert(err.message, "放大失败");
+            } finally {
+                stopUpscaleProgressPolling();
+                btn.disabled = false;
+                btn.innerText = "⚡ 开始高清超分 (Upscale)";
+            }
+        });
+
+        document.getElementById('upscale-res-view-btn')?.addEventListener('click', () => {
+            const src = document.getElementById('upscale-res-img')?.src;
+            if (src) {
+                openFullscreenViewer({ image_url: src, width: upscaleSrcNaturalW * 2, height: upscaleSrcNaturalH * 2, filename: 'upscale_preview.png' });
+            }
+        });
+        document.getElementById('upscale-res-gallery-btn')?.addEventListener('click', () => {
+            switchTab('gallery');
+        });
+
+        // 画廊详情弹窗内 2x / 4x 快捷放大
+        async function runModalUpscale(scale) {
+            if (!activeDetailItem || !activeDetailItem.filename) return;
+            const modelSelect = document.getElementById('modal-upscale-model-select') || document.getElementById('upscale-model-select');
+            const model = modelSelect?.value;
+            if (!model) {
+                showAlert("未检测到可用的超分辨率模型，请将 4x-UltraSharp.pth 放入 models/upscale_models/ 目录中", "缺少模型");
+                return;
+            }
+            const btn = document.getElementById(`modal-upscale-${scale}x-btn`);
+            const otherBtn = document.getElementById(`modal-upscale-${scale === 2 ? 4 : 2}x-btn`);
+            const origText = btn ? btn.innerText : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = `⏳ ${scale}x 放大中...`;
+            }
+            if (otherBtn) otherBtn.disabled = true;
+
+            const progressWrap = document.getElementById('modal-upscale-progress-wrap');
+            const progressDesc = document.getElementById('modal-upscale-desc');
+            const progressPct = document.getElementById('modal-upscale-pct');
+            const progressBar = document.getElementById('modal-upscale-bar');
+
+            if (progressWrap) progressWrap.style.display = 'block';
+            if (progressDesc) progressDesc.innerText = '正在载入超分模型...';
+            if (progressPct) progressPct.innerText = '0%';
+            if (progressBar) progressBar.style.width = '0%';
+
+            startUpscaleProgressPolling((task) => {
+                if (task) {
+                    const pctVal = Math.round((task.pct || 0) * 100);
+                    if (progressDesc) progressDesc.innerText = task.desc || '分块超分计算中...';
+                    if (progressPct) progressPct.innerText = `${pctVal}%`;
+                    if (progressBar) progressBar.style.width = `${pctVal}%`;
+                    if (btn) btn.innerText = `⏳ ${pctVal}% (${scale}x)`;
+                }
+            });
+
+            try {
+                const resp = await fetch('/api/upscale', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: activeDetailItem.filename,
+                        upscale_model: model,
+                        scale: scale,
+                    })
+                });
+                const res = await resp.json();
+                if (!resp.ok || !res.success) {
+                    throw new Error(res.detail || "放大失败");
+                }
+                showAlert(`已成功将图片超分放大至 ${res.width}x${res.height} (${scale}x)，已保存至画廊！`, "放大成功");
+                document.getElementById('modal-img').src = res.image_url;
+                document.getElementById('modal-dl-btn').href = res.image_url;
+                document.getElementById('modal-dl-btn').setAttribute('download', res.filename);
+                const ratioStr = formatAspectRatio(res.width, res.height);
+                const sizeEl = document.getElementById('modal-meta-size');
+                if (sizeEl) sizeEl.innerText = `📐 ${res.width} × ${res.height} (${ratioStr})`;
+
+                // 呈现超分专属元数据行
+                const upscaleRow = document.getElementById('modal-upscale-row');
+                const upscaleInfo = document.getElementById('modal-upscale-info');
+                if (upscaleRow && upscaleInfo) {
+                    upscaleRow.style.display = 'block';
+                    const origDim = (res.orig_width && res.orig_height) ? ` (原图: ${res.orig_width}×${res.orig_height})` : '';
+                    upscaleInfo.innerText = `${model} · ${scale}x 放大${origDim}`;
+                }
+
+                // 更新 activeDetailItem 并刷新画廊
+                if (res.metadata) {
+                    activeDetailItem = res.metadata;
+                } else {
+                    activeDetailItem.width = res.width;
+                    activeDetailItem.height = res.height;
+                    activeDetailItem.image_url = res.image_url;
+                    activeDetailItem.filename = res.filename;
+                    activeDetailItem.upscale_model = model;
+                    activeDetailItem.upscale_scale = scale;
+                }
+                fetchGallery(1);
+            } catch (err) {
+                showAlert(err.message, "放大失败");
+            } finally {
+                stopUpscaleProgressPolling();
+                if (progressWrap) progressWrap.style.display = 'none';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = origText;
+                }
+                if (otherBtn) otherBtn.disabled = false;
+            }
+        }
+
+        document.getElementById('modal-upscale-2x-btn')?.addEventListener('click', () => runModalUpscale(2));
+        document.getElementById('modal-upscale-4x-btn')?.addEventListener('click', () => runModalUpscale(4));
 
         // 页面初始化
         document.addEventListener('DOMContentLoaded', () => {
