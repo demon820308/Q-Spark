@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Version tag to release (e.g. v0.2.2)'
+        description: 'Version tag to release (e.g. v0.2.3)'
         required: true
-        default: 'v0.2.2'
+        default: 'v0.2.3'
 
 permissions:
   contents: write
@@ -51,16 +51,16 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: Q-Spark ${{ steps.release_info.outputs.tag }} - Windows x64 Portable
           body: |
-            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - AI Agent 技能生态与全动态模型管线
+            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 原生桌面守护宿主与 Agent 监控看板
 
             基于 `stable-diffusion.cpp` C++ 原生引擎构建的轻量、极速本地生图工作室，内置兼容 OpenAI 的 Agent 生图接口与即插即用 Agent Skill。
 
             ### 🚀 ${{ steps.release_info.outputs.tag }} 重磅升级 (Highlights)
-            - **🤖 全能 AI Agent 技能生态 (`skills/qspark`)**：内置全智能体通用本地生图技能包（支持 Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code, AutoGen 等），智能体作为画笔工具随调随走，保留思考大脑的同时享受纯本地 GPU 极速渲染。
-            - **⚙️ 单一可信源全动态模型管线**：`/v1/models`、`/v1/chat/completions` 与 Agent Skill 全面由 `config.json` 动态统一驱动，彻底消除硬编码，自动成套自适应 Z-Image / Qwen-Image 架构。
-            - **🖼️ 原生多模态图像指令编辑 (Image Edit)**：告别传统 Canvas 蒙版涂抹，采用 Qwen 原生空噪声起步与视觉投射器（Vision Projector）完整采样去噪链路，支持多参考图自然语言指令交互（自动识别并映射 `<image1>` / `<image2>`）。
-            - **⚡ 原生支持 Viggle Turbo 6-step 与 Z-Image 极速模型**：深度适配 6-step 与 8-step viggle-turbo 专属时间步 Sigmas 调度，纯 GPU 显存不溢出，极致出图效率。
-            - **⏹️ 实时任务秒级中断**：支持前端一键终止与 `/api/task/stop` 接口，毫秒级终止子进程并释放 GPU 显存。
+            - **🖥️ 原生桌面守护宿主与系统托盘 (`Q-Spark.exe`)**：精美沉浸式暗色原生 Shell 视窗，内置 Windows JobObject 操作系统级进程树护航，彻底告别僵尸进程与黑框终端。
+            - **🛸 微信/网易云级托盘无缝交互**：点击最小化（`—`）或关闭（`×`）秒进系统托盘，后台服务稳定保持运行保障外部 Agent 接口不中断，双击托盘图标 0 延迟秒级唤醒；提供直观的顶部与托盘【🛑 退出程序】入口。
+            - **🤖 外部 Agent 接入实时监控看板**：实时监听外部智能体（Claude Code, Cursor, Windsurf, Antigravity, Dify 等）调用动态；自适应长提示词多行展开与划选复制；内置现代几何暗色科技风 ON/OFF 滑动开关，默认完全静默（0 刷屏），支持按需长轮询与单次 `[⟳ 刷新]`。
+            - **⚙️ 模型与配置双向热同步**：桌面宿主与 Web 端实时同步 `config.json`，主生图模型、文本编码器（TE）、VAE 与默认步数支持界面化热配置并自动架构成套纠偏。
+            - **🛡️ 纯净独立环境隔离**：专有 Edge Profile 隔离机制，彻底消除多实例与 Chromium ProcessSingleton 冲突，开箱即用。
 
             ### 📦 便携版特性 (Portable Highlights)
             - **零依赖开箱即用**：内置轻量独立 Python 3.12 绿色运行时与所有依赖，无需在系统中另外安装 Python！

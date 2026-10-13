@@ -160,6 +160,9 @@ def compile_launcher(root_dir: str, output_exe: str):
         csc_exe,
         "/target:winexe",
         f"/win32icon:{ico_file}",
+        "/r:System.Windows.Forms.dll",
+        "/r:System.Drawing.dll",
+        "/r:System.Web.Extensions.dll",
         f"/out:{output_exe}",
         cs_file
     ]

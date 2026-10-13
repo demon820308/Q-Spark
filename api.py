@@ -6,7 +6,7 @@ import re
 import time
 from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
@@ -165,7 +165,8 @@ async def stop_task_api():
 
 
 @router.get("/api/metrics")
-async def get_metrics_api():
+async def get_metrics_api(response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return get_system_metrics()
 
 
@@ -599,8 +600,9 @@ async def openai_chat_completions(req: OpenAIChatRequest):
 # 5. 历史画廊管理 API
 # ==============================================================================
 @router.get("/api/history")
-async def get_history_api(page: int = 1, page_size: int = 24, source: Optional[str] = None):
+async def get_history_api(response: Response, page: int = 1, page_size: int = 24, source: Optional[str] = None):
     """获取历史画廊元数据列表，按生成时间倒序分页"""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     if not OUTPUTS_JSON_DIR.exists():
         return {"total": 0, "page": page, "page_size": page_size, "items": []}
 

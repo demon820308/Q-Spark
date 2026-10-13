@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Q-Spark Studio — 服务与 Agent 监控宿主</title>
+  <link rel="icon" type="image/x-icon" href="/app.ico">
+  <link rel="shortcut icon" href="/app.ico">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #121214;
+      color: #f4f4f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      user-select: none;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    /* 顶部状态与操作条 */
+    .top-bar {
+      background-color: #18181b;
+      border-bottom: 1px solid #27272a;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .status-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .dot-ping {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+    .status-text {
+      font-weight: 600;
+      color: #10b981;
+      font-size: 13px;
+    }
+    .badge-pid {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      padding: 0 5px;
+      border-radius: 3px;
+      font-family: Consolas, monospace;
+      font-size: 10px;
+      line-height: 16px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-left: 6px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .port-text {
+      color: #a1a1aa;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .vram-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .vram-label { color: #a1a1aa; white-space: nowrap; }
+    .vram-bar-bg {
+      width: 60px;
+      height: 6px;
+      background: #3f3f46;
+      border-radius: 3px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .vram-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #f59e0b);
+      transition: width 0.3s ease;
+    }
+    .vram-val { font-family: Consolas, monospace; color: #f4f4f5; white-space: nowrap; }
+
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .btn {
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-web {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fcd34d;
+    }
+    .btn-web:hover { background: rgba(245, 158, 11, 0.25); }
+    .btn-flush {
+      background: #27272a;
+      border-color: #3f3f46;
+      color: #e4e4e7;
+    }
+    .btn-flush:hover { background: #3f3f46; }
+    .btn-stop {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+    }
+    .btn-stop:hover { background: rgba(244, 63, 94, 0.25); }
+    .btn-start {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #6ee7b7;
+    }
+    .btn-start:hover { background: rgba(16, 185, 129, 0.25); }
+    .btn-restart {
+      background: #27272a;
+      border-color: #3f3f46;
+      color: #e4e4e7;
+    }
+    .btn-restart:hover { background: #3f3f46; }
+    .btn-quit {
+      background: rgba(220, 38, 38, 0.15);
+      border-color: rgba(220, 38, 38, 0.4);
+      color: #f87171;
+    }
+    .btn-quit:hover {
+      background: rgba(220, 38, 38, 0.3);
+      color: #fecaca;
+    }
+
+    /* 选项卡导航条 */
+    .nav-bar {
+      background: #18181b;
+      border-bottom: 1px solid #27272a;
+      display: flex;
+      gap: 16px;
+      padding: 0 16px;
+      height: 38px;
+      flex-shrink: 0;
+    }
+    .nav-tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #a1a1aa;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 4px;
+      transition: all 0.15s ease;
+    }
+    .nav-tab:hover { color: #f4f4f5; }
+    .nav-tab.active {
+      color: #f59e0b;
+      border-bottom-color: #f59e0b;
+      font-weight: 600;
+    }
+    .tab-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+
+    /* 主体内容视图区 */
+    .view-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .view-container::-webkit-scrollbar { width: 6px; }
+    .view-container::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+
+    /* 暗色卡片 */
+    .card {
+      background: #1c1c20;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: #f4f4f5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-sub {
+      font-size: 11px;
+      color: #a1a1aa;
+      font-weight: normal;
+    }
+    .btn-copy {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      color: #e4e4e7;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .btn-copy:hover { background: #3f3f46; }
+
+    .url-box {
+      background: #0d0d10;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      color: #34d399;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .auth-hint { color: #71717a; font-size: 11px; font-family: sans-serif; }
+
+    /* 三元组网格卡片 */
+    .triplet-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .mini-card {
+      background: rgba(39, 39, 42, 0.5);
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .mini-label { font-size: 11px; color: #a1a1aa; }
+    .mini-value {
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      color: #f4f4f5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .val-diff { color: #fcd34d; font-weight: 500; }
+
+    /* 调用动态条目 */
+    .event-card {
+      background: rgba(39, 39, 42, 0.6);
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .event-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tag-agent {
+      background: rgba(168, 85, 247, 0.2);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #d8b4fe;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .event-type { color: #f4f4f5; font-size: 12px; margin-left: 6px; }
+    .event-time { font-family: Consolas, monospace; color: #a1a1aa; font-size: 11px; }
+    .event-quote {
+      background: rgba(13, 13, 16, 0.8);
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #e4e4e7;
+      font-style: italic;
+      min-height: 48px;
+      max-height: 130px;
+      overflow-y: auto;
+      line-height: 1.5;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      user-select: text;
+    }
+    .event-quote::-webkit-scrollbar {
+      width: 4px;
+    }
+    .event-quote::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 2px;
+    }
+    .event-foot {
+      display: flex;
+      justify-content: space-between;
+      color: #a1a1aa;
+      font-size: 11px;
+    }
+    .state-success { color: #34d399; font-weight: 500; }
+
+    /* 动态监听控制组 (倾斜现代质感 ON/OFF 开关) */
+    .switch-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-single-fetch {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      color: #d4d4d8;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s ease;
+      height: 22px;
+      line-height: 1;
+    }
+    .btn-single-fetch:hover {
+      background: #3f3f46;
+      color: #ffffff;
+      border-color: #52525b;
+    }
+    .btn-single-fetch:active {
+      transform: scale(0.95);
+    }
+    .listener-status {
+      font-size: 11px;
+      color: #71717a;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.2s ease;
+    }
+    .listener-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #71717a;
+      transition: all 0.2s ease;
+    }
+    .tgl-skewed-wrap {
+      display: inline-block;
+      cursor: pointer;
+      user-select: none;
+      vertical-align: middle;
+    }
+    .tgl-skewed {
+      display: none;
+    }
+    .tgl-btn {
+      position: relative;
+      display: block;
+      width: 58px;
+      height: 22px;
+      outline: 0;
+      cursor: pointer;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 4px;
+      transform: skew(-10deg);
+      overflow: hidden;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tgl-btn:hover {
+      border-color: #52525b;
+    }
+    .tgl-btn:before,
+    .tgl-btn:after {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: Consolas, -apple-system, sans-serif;
+      letter-spacing: 0.8px;
+      transform: skew(10deg);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tgl-btn:before {
+      left: 0;
+      content: attr(data-tg-off);
+      color: #71717a;
+      background: #202024;
+    }
+    .tgl-btn:after {
+      left: 100%;
+      content: attr(data-tg-on);
+      color: #ffffff;
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    }
+    .tgl-skewed:checked + .tgl-btn {
+      border-color: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+    }
+    .tgl-skewed:checked + .tgl-btn:before {
+      left: -100%;
+    }
+    .tgl-skewed:checked + .tgl-btn:after {
+      left: 0;
+    }
+
+    /* 配置表单 */
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .form-input {
+      background: #0d0d10;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #f4f4f5;
+      font-size: 12px;
+      outline: none;
+      flex: 1;
+    }
+    .form-input:focus { border-color: #f59e0b; }
+    .form-label {
+      width: 90px;
+      color: #a1a1aa;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    select.form-input {
+      cursor: pointer;
+    }
+
+    .btn-save-cfg {
+      background: #f59e0b;
+      color: #000;
+      font-weight: 600;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-save-cfg:hover { background: #d97706; }
+
+    /* 实时日志窗口 */
+    .log-box {
+      flex: 1;
+      background: #0d0d10;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      color: #e4e4e7;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* 底部条 */
+    .footer-bar {
+      background: #18181b;
+      border-top: 1px solid #27272a;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 11px;
+      color: #71717a;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. 顶部状态与快速控制 -->
+  <div class="top-bar">
+    <div class="status-group">
+      <div class="status-badge">
+        <span class="dot-ping" id="dot-status"></span>
+        <span class="status-text" id="txt-status">服务正常</span>
+      </div>
+      <span class="port-text" id="txt-port">127.0.0.1:40188</span>
+      <div class="vram-badge">
+        <span class="vram-label">显存(VRAM)</span>
+        <div class="vram-bar-bg">
+          <div class="vram-bar-fill" id="vram-fill"></div>
+        </div>
+        <span class="vram-val" id="vram-val">5.1 / 16.0 GB</span>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-web" onclick="window.open('http://127.0.0.1:40188/', '_blank')">🌐 打开网页</button>
+      <button class="btn btn-flush" onclick="flushVram()" id="btn-flush">🧹 释放显存</button>
+      <button class="btn btn-stop" onclick="togglePower()" id="btn-power">⏹ 停止</button>
+      <button class="btn btn-restart" onclick="restartService()" id="btn-restart">🔄 重启</button>
+      <button class="btn btn-quit" onclick="quitApp()" id="btn-quit" title="彻底停止后台服务并退出程序">🛑 退出程序</button>
+    </div>
+  </div>
+
+  <!-- 2. 选项卡导航条 (保证顺序与指示线完全一致) -->
+  <div class="nav-bar">
+    <button class="nav-tab active" id="tab-0" onclick="switchTab(0)">
+      <span>🤖</span> 外部 Agent 接入监控
+    </button>
+    <button class="nav-tab" id="tab-1" onclick="switchTab(1)">
+      <span>⚙️</span> 模型与路径配置 (与Web同步)
+    </button>
+    <button class="nav-tab" id="tab-2" onclick="switchTab(2)">
+      <span>📜</span> 实时运行日志
+      <span class="tab-dot"></span>
+    </button>
+  </div>
+
+  <!-- 3. 主体视窗区域 -->
+  <!-- TAB 0: 外部 Agent 监控 -->
+  <div class="view-container" id="view-0">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><span style="color:#f59e0b">●</span> 外部 Agent 接口 (OpenAI Compatible)</span>
+        <button class="btn-copy" onclick="copyApi()" id="btn-copy-api">📋 复制接口地址</button>
+      </div>
+      <div class="url-box">
+        <span>http://127.0.0.1:40188/v1/images/generations</span>
+        <span class="auth-hint">Auth: None (免鉴权)</span>
+      </div>
+      <div class="triplet-grid">
+        <div class="mini-card">
+          <span class="mini-label">🎯 默认生效主模型</span>
+          <span class="mini-value val-diff" id="disp-diff">z_image_turbo_int8</span>
+        </div>
+        <div class="mini-card">
+          <span class="mini-label">🧠 文本编码器 (TE)</span>
+          <span class="mini-value" id="disp-te">qwen_3_4b_fp8</span>
+        </div>
+        <div class="mini-card">
+          <span class="mini-label">🖼️ VAE 解码 / 步数</span>
+          <span class="mini-value" id="disp-vae">ae.safetensors · 9步</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <span>⚡</span> 最近调用动态
+          <span class="badge-sub" id="txt-call-count">(待开启监听)</span>
+        </span>
+        <div class="switch-container">
+          <button class="btn-single-fetch" onclick="pollHistory(true)" title="单次拉取最新状态">⟳ 刷新</button>
+          <span class="listener-status" id="agent-listener-box">
+            <span class="listener-dot" id="agent-listener-dot"></span>
+            <span id="agent-listener-text">静默待命</span>
+          </span>
+          <label class="tgl-skewed-wrap" title="点击切换自动轮询监听">
+            <input type="checkbox" id="tgl-history-poll" class="tgl-skewed" onchange="toggleHistoryPolling(this.checked)">
+            <span class="tgl-btn" data-tg-off="OFF" data-tg-on="ON"></span>
+          </label>
+        </div>
+      </div>
+      <div class="event-card">
+        <div class="event-head">
+          <div>
+            <span class="tag-agent" id="event-tag" style="background:#27272a;border-color:#3f3f46;color:#a1a1aa;">待命</span>
+            <span class="event-type" id="event-type">自动监听休眠中</span>
+          </div>
+          <span class="event-time" id="event-time">--:--:--</span>
+        </div>
+        <div class="event-quote" id="event-prompt">
+          "监听开关默认关闭以保持静默。需要时请打开右上角【ON 开关】或点击【⟳ 刷新】摘取最新状态。"
+        </div>
+        <div class="event-foot">
+          <span id="event-params">参数: --</span>
+          <span class="state-success" id="event-sync-state" style="color:#71717a;">○ 监听休眠</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 1: 模型与路径配置 (与 Web 同步) -->
+  <div class="view-container" id="view-1" style="display:none;">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📁 模型存储主目录 (models_dir)</span>
+        <button class="btn-copy" onclick="scanModels()" id="btn-scan">🔍 重新扫描目录</button>
+      </div>
+      <div class="form-row">
+        <input type="text" class="form-input" id="input-dir" value="models">
+        <button class="btn btn-flush" onclick="alert('请直接在输入框编辑路径或从历史下拉中选择')">修改</button>
+      </div>
+      <span style="font-size:11px;color:#a1a1aa;" id="txt-scan-stat">已扫描到模型库并与 Web 端完全同步</span>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🎯 外部 Agent 默认模型设置 (写入 config.json)</span>
+        <span style="font-size:10px;color:#f59e0b;background:rgba(245,158,11,0.1);padding:2px 6px;border-radius:4px;border:1px solid rgba(245,158,11,0.3);">修改后立即热生效</span>
+      </div>
+      <div class="form-row">
+        <span class="form-label">主生图模型:</span>
+        <select class="form-input" id="sel-diff" onchange="onDiffChange()"></select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">文本编码器:</span>
+        <select class="form-input" id="sel-te"></select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">VAE 解码器:</span>
+        <select class="form-input" id="sel-vae"></select>
+      </div>
+      <div class="form-row">
+        <span class="form-label">默认步数:</span>
+        <input type="number" class="form-input" id="input-steps" value="9" min="1" max="50" style="max-width:80px;">
+        <span style="color:#71717a;font-size:11px;">步</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px;border-top:1px solid #27272a;">
+        <span style="font-size:11px;color:#71717a;" id="txt-save-msg">保存时自动触发架构联动成套纠偏</span>
+        <button class="btn-save-cfg" onclick="saveConfig()" id="btn-save">💾 保存为外部 Agent 默认模型</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: 实时运行日志 -->
+  <div class="view-container" id="view-2" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <button class="btn btn-flush" onclick="document.getElementById('log-content').innerText=''">清空日志</button>
+      <label style="font-size:11px;color:#a1a1aa;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="chk-autoscroll" checked> 自动滚动到底部
+      </label>
+    </div>
+    <div class="log-box" id="log-content">正在连接本地 Q-Spark 运行管道...</div>
+  </div>
+
+  <!-- 4. 底部微型状态栏 -->
+  <div class="footer-bar">
+    <span>● Windows JobObject: 护航中 (防残留)</span>
+    <div style="display:flex;align-items:center;">
+      <span>Q-Spark Studio v0.2.3</span>
+      <span class="badge-pid" id="badge-pid">PID: --</span>
+    </div>
+  </div>
+
+  <script>
+    let isRunning = true;
+    let cachedConfig = null;
+
+    function switchTab(idx) {
+      for (let i = 0; i < 3; i++) {
+        document.getElementById('view-' + i).style.display = (i === idx) ? 'flex' : 'none';
+        document.getElementById('tab-' + i).className = (i === idx) ? 'nav-tab active' : 'nav-tab';
+      }
+    }
+
+    function copyApi() {
+      const btn = document.getElementById('btn-copy-api');
+      navigator.clipboard.writeText("http://127.0.0.1:40188/v1/images/generations").then(() => {
+        btn.innerText = "✅ 已复制";
+        setTimeout(() => { btn.innerText = "📋 复制接口地址"; }, 1500);
+      });
+    }
+
+    function togglePower() {
+      const btn = document.getElementById('btn-power');
+      btn.innerText = "⏳ 处理中...";
+      fetch('/api/power', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          isRunning = d.running;
+          updatePowerBtn();
+        })
+        .catch(() => {
+          isRunning = !isRunning;
+          updatePowerBtn();
+        });
+    }
+
+    function updatePowerBtn() {
+      const btn = document.getElementById('btn-power');
+      const dot = document.getElementById('dot-status');
+      const txt = document.getElementById('txt-status');
+      const port = document.getElementById('txt-port');
+      const fill = document.getElementById('vram-fill');
+      const val = document.getElementById('vram-val');
+
+      if (isRunning) {
+        btn.className = "btn btn-stop";
+        btn.innerText = "⏹ 停止";
+        dot.style.background = "#10b981";
+        dot.style.boxShadow = "0 0 8px #10b981";
+        txt.innerText = "服务正常";
+        txt.style.color = "#10b981";
+        port.innerText = "127.0.0.1:40188";
+      } else {
+        btn.className = "btn btn-start";
+        btn.innerText = "▶ 启动";
+        dot.style.background = "#71717a";
+        dot.style.boxShadow = "none";
+        txt.innerText = "服务已停止";
+        txt.style.color = "#a1a1aa";
+        port.innerText = "未监听";
+        fill.style.width = "0%";
+        val.innerText = "0.0 / 16.0 GB (空闲)";
+      }
+    }
+
+    function restartService() {
+      const btn = document.getElementById('btn-restart');
+      btn.innerText = "⏳ 重启中...";
+      fetch('/api/restart', { method: 'POST' })
+        .finally(() => {
+          setTimeout(() => { btn.innerText = "🔄 重启"; }, 1500);
+        });
+    }
+
+    function quitApp() {
+      if (confirm("是否确认彻底退出 Q-Spark Studio 并停止所有后台服务？")) {
+        fetch('/api/quit', { method: 'POST' }).catch(() => {});
+        setTimeout(() => { window.close(); }, 150);
+      }
+    }
+
+    function flushVram() {
+      const btn = document.getElementById('btn-flush');
+      btn.innerText = "⏳ 清理中...";
+      fetch('http://127.0.0.1:40188/api/vram/flush', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+          btn.innerText = "✅ 显存已清空";
+          setTimeout(() => { btn.innerText = "🧹 释放显存"; }, 1200);
+        })
+        .catch(() => { btn.innerText = "🧹 释放显存"; });
+    }
+
+    let hasActiveTask = false;
+
+    function pollMetrics() {
+      fetch('http://127.0.0.1:40188/api/metrics?t=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(d => {
+          if (!isRunning) return;
+          const v = d.vram || {};
+          const u = (v.used != null) ? v.used : (d.vram_used || 0);
+          const t = (v.total != null) ? v.total : (d.vram_total || 16);
+          const pct = (v.pct != null) ? v.pct : Math.min(100, Math.round((u / t) * 100));
+          document.getElementById('vram-fill').style.width = pct + '%';
+          document.getElementById('vram-val').innerText = `${u.toFixed(1)} / ${t.toFixed(1)} GB`;
+
+          if (d.active_task) {
+            hasActiveTask = true;
+            renderActiveTask(d.active_task);
+          } else {
+            if (hasActiveTask) {
+              hasActiveTask = false;
+              pollHistory(true);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    function renderActiveTask(task) {
+      const dot = document.getElementById('agent-listener-dot');
+      const listenerText = document.getElementById('agent-listener-text');
+      if (dot) {
+        dot.style.background = '#f59e0b';
+        dot.style.boxShadow = '0 0 8px #f59e0b';
+      }
+      if (listenerText) {
+        listenerText.innerText = '正在生成中...';
+        listenerText.style.color = '#f59e0b';
+      }
+
+      let tagText = 'Agent 任务';
+      if (task.source === 'api_dalle') tagText = 'Agent (DALL-E)';
+      else if (task.source === 'api_chat') tagText = 'Agent 对话 (Chat)';
+      else if (task.source === 'web') tagText = 'Web-UI';
+
+      const tagEl = document.getElementById('event-tag');
+      if (tagEl) {
+        tagEl.innerText = tagText;
+        tagEl.style.background = 'rgba(245, 158, 11, 0.15)';
+        tagEl.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+        tagEl.style.color = '#fbbf24';
+      }
+
+      const pctNum = Math.round((task.pct || 0) * 100);
+      document.getElementById('event-type').innerText = `⚡ ${task.desc || '推理运算中...'} (${pctNum}%)`;
+
+      const elapsed = Math.max(0, (Date.now() / 1000 - (task.start_time || Date.now() / 1000))).toFixed(1);
+      document.getElementById('event-time').innerText = `已耗时 ${elapsed}s`;
+
+      let p = (task.prompt || '').trim();
+      document.getElementById('event-prompt').innerText = `"${p}"`;
+
+      const diffM = task.diff_model ? task.diff_model.replace('.safetensors', '').replace('.gguf', '') : '';
+      document.getElementById('event-params').innerText = `尺寸: ${task.width}x${task.height} · 步数: ${task.steps || 8} · 模型: ${diffM}`;
+
+      const syncEl = document.getElementById('event-sync-state');
+      if (syncEl) {
+        syncEl.innerText = '⚡ 实时运算中';
+        syncEl.style.color = '#f59e0b';
+      }
+    }
+
+    function loadConfig() {
+      fetch('http://127.0.0.1:40188/api/config')
+        .then(r => r.json())
+        .then(d => {
+          cachedConfig = d;
+          const cfg = d.config || {};
+          const curDiff = cfg.api_diff_model || "";
+          const curTe = cfg.api_te_model || "";
+          const curVae = cfg.api_vae_model || "";
+          const curSteps = cfg.api_steps || 9;
+
+          document.getElementById('disp-diff').innerText = curDiff.replace('.safetensors', '').replace('.gguf', '') || "默认";
+          document.getElementById('disp-te').innerText = curTe.replace('.safetensors', '').replace('.gguf', '') || "自动匹配";
+          document.getElementById('disp-vae').innerText = (curVae || "ae.safetensors") + ` · ${curSteps}步`;
+          document.getElementById('input-dir').value = d.models_dir || "models";
+
+          populateSelect('sel-diff', d.diff_choices || [], curDiff);
+          populateSelect('sel-te', d.te_choices || [], curTe);
+          populateSelect('sel-vae', d.vae_choices || [], curVae);
+          document.getElementById('input-steps').value = curSteps;
+        })
+        .catch(() => {});
+    }
+
+    function populateSelect(id, items, cur) {
+      const s = document.getElementById(id);
+      s.innerHTML = "";
+      items.forEach(it => {
+        const opt = document.createElement('option');
+        opt.value = it;
+        opt.innerText = it;
+        if (it === cur) opt.selected = true;
+        s.appendChild(opt);
+      });
+    }
+
+    function onDiffChange() {
+      const diff = document.getElementById('sel-diff').value.toLowerCase();
+      const te = document.getElementById('sel-te');
+      const vae = document.getElementById('sel-vae');
+      if (diff.includes('z_image')) {
+        for (let i = 0; i < te.options.length; i++) {
+          if (te.options[i].value.toLowerCase().includes('qwen_3_4b')) { te.selectedIndex = i; break; }
+        }
+        for (let i = 0; i < vae.options.length; i++) {
+          if (vae.options[i].value.toLowerCase().includes('ae.')) { vae.selectedIndex = i; break; }
+        }
+      } else if (diff.includes('qwen')) {
+        for (let i = 0; i < te.options.length; i++) {
+          if (te.options[i].value.toLowerCase().includes('qwen3vl') || te.options[i].value.toLowerCase().includes('qwen-image')) { te.selectedIndex = i; break; }
+        }
+        for (let i = 0; i < vae.options.length; i++) {
+          if (vae.options[i].value.toLowerCase().includes('qwen')) { vae.selectedIndex = i; break; }
+        }
+      }
+    }
+
+    function scanModels() {
+      const btn = document.getElementById('btn-scan');
+      const dir = document.getElementById('input-dir').value.trim();
+      btn.innerText = "⏳ 扫描中...";
+      fetch('http://127.0.0.1:40188/api/models/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ models_dir: dir })
+      })
+      .then(r => r.json())
+      .then(d => {
+        loadConfig();
+        btn.innerText = "✅ 扫描完成";
+        setTimeout(() => { btn.innerText = "🔍 重新扫描目录"; }, 1200);
+      })
+      .catch(() => { btn.innerText = "🔍 重新扫描目录"; });
+    }
+
+    function saveConfig() {
+      const btn = document.getElementById('btn-save');
+      const msg = document.getElementById('txt-save-msg');
+      btn.innerText = "⏳ 保存中...";
+      const payload = {
+        diff_model: document.getElementById('sel-diff').value,
+        te_model: document.getElementById('sel-te').value,
+        vae_model: document.getElementById('sel-vae').value,
+        steps: parseInt(document.getElementById('input-steps').value) || 9
+      };
+      fetch('http://127.0.0.1:40188/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(r => r.json())
+      .then(() => {
+        btn.innerText = "✅ 保存成功";
+        msg.innerText = "已写入 config.json 并实时生效!";
+        msg.style.color = "#10b981";
+        loadConfig();
+        setTimeout(() => {
+          btn.innerText = "💾 保存为外部 Agent 默认模型";
+          msg.innerText = "保存时自动触发架构联动成套纠偏";
+          msg.style.color = "#71717a";
+        }, 2000);
+      })
+      .catch(() => { btn.innerText = "💾 保存为外部 Agent 默认模型"; });
+    }
+
+    function pollLogs() {
+      fetch('/api/logs?t=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.text())
+        .then(txt => {
+          if (txt) {
+            const el = document.getElementById('log-content');
+            el.innerText = txt;
+            if (document.getElementById('chk-autoscroll').checked) {
+              el.scrollTop = el.scrollHeight;
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    let historyPollInterval = null;
+    let isHistoryPolling = false;
+
+    function toggleHistoryPolling(enabled) {
+      isHistoryPolling = enabled;
+      const dot = document.getElementById('agent-listener-dot');
+      const txt = document.getElementById('agent-listener-text');
+      const syncEl = document.getElementById('event-sync-state');
+
+      if (historyPollInterval) {
+        clearInterval(historyPollInterval);
+        historyPollInterval = null;
+      }
+
+      if (enabled) {
+        if (dot) {
+          dot.style.background = '#10b981';
+          dot.style.boxShadow = '0 0 6px rgba(16, 185, 129, 0.6)';
+        }
+        if (txt) {
+          txt.innerText = '实时监听中';
+          txt.style.color = '#10b981';
+        }
+        if (syncEl) {
+          syncEl.innerText = '● 实时同步中';
+          syncEl.style.color = '#10b981';
+        }
+        pollHistory(true);
+        historyPollInterval = setInterval(() => pollHistory(false), 2000);
+      } else {
+        if (dot) {
+          dot.style.background = '#71717a';
+          dot.style.boxShadow = 'none';
+        }
+        if (txt) {
+          txt.innerText = '静默待命';
+          txt.style.color = '#71717a';
+        }
+        if (syncEl) {
+          syncEl.innerText = '○ 监听休眠';
+          syncEl.style.color = '#71717a';
+        }
+      }
+    }
+
+    function pollHistory(manual = false) {
+      if (hasActiveTask) return;
+      if (!manual && !isHistoryPolling) return;
+
+      fetch('http://127.0.0.1:40188/api/history?page_size=20&t=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+          if (hasActiveTask) return;
+          const dot = document.getElementById('agent-listener-dot');
+          const listenerText = document.getElementById('agent-listener-text');
+          if (isHistoryPolling) {
+            if (dot) {
+              dot.style.background = '#10b981';
+              dot.style.boxShadow = '0 0 6px rgba(16, 185, 129, 0.6)';
+            }
+            if (listenerText) {
+              listenerText.innerText = '实时监听中';
+              listenerText.style.color = '#10b981';
+            }
+          }
+          const syncEl = document.getElementById('event-sync-state');
+          if (syncEl) {
+            syncEl.innerText = isHistoryPolling ? '● 实时就绪' : '● 数据已刷新';
+            syncEl.style.color = '#10b981';
+          }
+
+          const items = data.items || [];
+          if (!items.length) {
+            document.getElementById('txt-call-count').innerText = '(暂无调用)';
+            document.getElementById('event-tag').innerText = '就绪';
+            document.getElementById('event-type').innerText = '等待任务中...';
+            document.getElementById('event-time').innerText = '--:--:--';
+            document.getElementById('event-prompt').innerText = '暂无生成历史，等待外部 Agent 或对话调用...';
+            document.getElementById('event-params').innerText = '参数: --';
+            return;
+          }
+
+          const agentItems = items.filter(it => it.source === 'api_dalle' || it.source === 'api_chat');
+          const target = agentItems.length > 0 ? agentItems[0] : items[0];
+          const count = agentItems.length;
+
+          document.getElementById('txt-call-count').innerText = `(Agent 累计: ${count} 次 / 历史总计: ${data.total || items.length} 条)`;
+
+          let tagText = 'Web-UI';
+          if (target.source === 'api_dalle') tagText = 'Agent (DALL-E)';
+          else if (target.source === 'api_chat') tagText = 'Agent 对话 (Chat)';
+
+          const tagEl = document.getElementById('event-tag');
+          if (tagEl) {
+            tagEl.innerText = tagText;
+            tagEl.style.background = 'rgba(16, 185, 129, 0.15)';
+            tagEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            tagEl.style.color = '#34d399';
+          }
+
+          document.getElementById('event-type').innerText = `${target.mode || 'txt2img'} · ${target.aspect_ratio || ''}`;
+          
+          const durStr = target.duration_seconds ? `耗时 ${target.duration_seconds.toFixed(1)}s` : '';
+          document.getElementById('event-time').innerText = `${target.created_time || ''} · ${durStr}`;
+          
+          let p = (target.prompt || '').trim();
+          document.getElementById('event-prompt').innerText = `"${p}"`;
+
+          const diffM = target.diff_model ? target.diff_model.replace('.safetensors', '').replace('.gguf', '') : '';
+          document.getElementById('event-params').innerText = `尺寸: ${target.width}x${target.height} · 步数: ${target.steps} · 种子: ${target.seed} · 模型: ${diffM}`;
+        })
+        .catch(() => {});
+    }
+
+    function pollStatus() {
+      fetch('/api/status?t=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(d => {
+          isRunning = d.running;
+          const badge = document.getElementById('badge-pid');
+          if (d.running && d.pid) {
+            badge.innerText = `PID: ${d.pid}`;
+            badge.style.background = 'rgba(16, 185, 129, 0.15)';
+            badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            badge.style.color = '#34d399';
+          } else {
+            badge.innerText = '已离线';
+            badge.style.background = '#27272a';
+            badge.style.borderColor = '#3f3f46';
+            badge.style.color = '#71717a';
+          }
+          updatePowerBtn();
+        })
+        .catch(() => {});
+    }
+
+    // 初始化轮询 (历史动态默认不发请求，按需开启)
+    setInterval(pollStatus, 1500);
+    setInterval(pollMetrics, 1500);
+    setInterval(pollLogs, 2000);
+    setTimeout(loadConfig, 500);
+    setTimeout(pollStatus, 200);
+  </script>
+</body>
+</html>

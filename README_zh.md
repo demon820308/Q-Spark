@@ -3,7 +3,7 @@
   <h1>Q-Spark 生图控制台</h1>
   <p><strong>基于 stable-diffusion.cpp C++ 原生引擎的轻量高性能本地 AI 生图工作室，支持兼容 OpenAI 的 Agent API。</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.2</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.3</a> ·
     <a href="#核心功能特性">核心特性</a> ·
     <a href="#快速上手">快速上手</a> ·
     <a href="#模型库与目录规范">模型库指引</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=%E7%89%88%E6%9C%AC" alt="最新版本" /></a>
-    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.2-green" alt="版本 v0.2.2" />
+    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.3-green" alt="版本 v0.2.3" />
     <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/%E5%BA%95%E5%B1%82%E5%BC%95%E6%93%8E-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ 引擎" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/%E5%BC%80%E6%BA%90%E5%8D%8F%E8%AE%AE-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,36 +31,32 @@
 
 ---
 
-## 🌟 v0.2.2 核心功能特性
+## 🌟 v0.2.3 核心功能特性
 
-### 1. 🎨 创作工作台多模态进阶（模式隔离，智能流转）
-- **文生图 (txt2img)**：零底图纯文本极速出图，模型特征步数自适应，支持采样步数、随机种子、CFG 细致调节。
-- **图像指令编辑 (Image Edit)**：基于视觉投射器（Vision Projector）的纯净空噪声起步编辑模式，摆脱传统图生图底图噪波干扰，忠实遵循自然语言修改指令。
-- **多图参考与视觉 Token 智能映射**：支持最多 3 张参考图；提示词中输入的“图1”、“图2”、“图片1”等自然语言，系统自动识别并映射为 Qwen 原生视觉 Token `<image1>` / `<image2>`。
-- **实时任务中断 (⏹️ 停止任务)**：前端提供一键终止按钮，调用 `/api/task/stop` 毫秒级杀灭底层生成子进程，即刻释放 GPU 显存。
+### 1. 🖥️ 原生桌面守护宿主与系统托盘 (`Q-Spark.exe`)
+- **沉浸式暗色宿主视窗**：纯原生组件构建的高颜值桌面监控宿主视窗，彻底告别简陋黑框命令行终端。
+- **Windows JobObject 操作系统级进程树护航**：内核级绑定所有子进程（Python 服务、C++ 推理后端），退出完全回收，严防任何僵尸进程与端口残留。
+- **纯净独立浏览器隔离**：专有 Edge Profile 隔离机制，彻底消除与本地系统日常 Edge 浏览器的单例锁冲突，开箱即用稳定长驻。
 
-### 2. 🏷️ 多 LoRA 动态挂载管理器
-- 自动扫描识别 `models/loras/` 下的 safetensors 权重。
-- 下拉选择与即时挂载，每个 LoRA 独立调节权重（0.1 ~ 2.0），自动展开提示词宏并传参至底层 CLI。
+### 2. 🛸 微信/网易云级托盘无缝交互
+- **极速托盘收缩**：点击最小化（`—`）或关闭（`×`）秒进右下角系统托盘，毫秒级隐藏，零延迟、零卡顿。
+- **后台服务不中断**：视窗收缩托盘后后台生图模型与 API 服务平稳常驻，保障外部 AI Agent 连续画图作业不中断。
+- **秒级唤醒与彻底退出**：双击托盘图标即刻恢复窗口，状态完整保留；提供顶部状态栏与托盘菜单双重【🛑 退出程序】入口。
 
-### 3. 🖼️ 全功能沉浸式历史画廊 2.0
-- **伴生元数据永久保存**：每张图片生成均附带独立 Sidecar JSON，完整记录提示词、负面词、模型组合、LoRA 挂载列表、步数、CFG、耗时与模式标记。
-- **工作流一键闭环流转**：
-  - `⚡ 参数重绘 / 复用`：一键将历史参数自动回填至创作表单；
-  - `🔄 垫图`：一键将历史图送入参考图区域进行二次编辑。
-- **方案 A 沉浸式原图查看器**：全屏大图预览，支持原图 1:1 物理像素与适应屏幕双态缩放切换，支持 ESC 键或点击遮罩随时关闭。
+### 3. 🤖 外部 Agent 接入实时监控看板
+- **实时调用流监控**：即时捕获外部 Agent（Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code 等）的生图请求、模型参数与耗时。
+- **提示词长文本自适应展开**：提示词卡片动态撑开多行，配备暗色极简微型滚动条，支持鼠标任意划选复制。
+- **零刷屏按需轮询开关**：内置现代几何暗色科技风 ON/OFF 滑动开关，默认完全静默（0 接口请求不刷屏控制台），支持按需开启长轮询或单次 `[⟳ 刷新]`。
 
-### 4. 🧠 硬件监控与自适应调度
-- **硬件实时监控**：毫秒级采集 GPU 显存 (VRAM)、系统内存 (RAM) 与 CPU 占用率，提供动态色条状态预警。
-- **智能步数与调度器自适应**：依据加载模型自动匹配最佳步数（Viggle Turbo 自动 6 步并挂载动态分辨率 Sigmas，Turbo/Z-Image 自动 8 步，标准模型 25 步）。
-- **三种显存管理策略**：
-  - **即用即走（On-Demand）**：冷启动生成，任务结束显存 0MB 闲置占用（8~10GB 显卡强烈推荐）；
-  - **智能休眠（Auto-Unload）**：5 分钟闲置自动卸载显存（需 16GB+ 显存）；
-  - **显存常驻（Always-On）**：后台常驻模型，秒级响应（需 16GB+ 显存）。
+### 4. ⚙️ 模型与配置双向热同步
+- 桌面宿主与 Web 端实时双向同步 `config.json`。
+- 主生图模型、文本编码器（TE）、VAE 与默认步数支持界面化热配置并自动成套联动纠偏。
 
-### 5. 🤖 全能 AI Agent 技能生态与全动态模型管线
-- **全智能体通用 Skill 支持**：内置标准化 `skills/qspark` 技能包与调用脚本，兼容所有主流 AI Agent（Claude Code, Cursor, Windsurf, Antigravity, Dify, Roo Code, AutoGen, 自定义 Python 智能体等），使任何 Agent 均可作为画笔工具随调随走。
-- **单一可信源 (Zero Hardcoding)**：所有 API（`/v1/models`、`/v1/chat/completions` 与 Skill）完全由 `config.json` 动态统一驱动，彻底消除硬编码，自动成套自适应 Z-Image / Qwen-Image 架构。
+### 5. 🎨 创作工作台多模态进阶
+- **文生图 (txt2img)**：零底图纯文本极速出图，模型特征步数自适应。
+- **图像指令编辑 (Image Edit)**：纯净空噪声起步编辑模式，遵循自然语言指令修改。
+- **多图参考与视觉 Token 智能映射**：支持最多 3 张参考图，自动识别“图1”、“图2”映射为 Qwen 原生视觉 Token `<image1>` / `<image2>`。
+- **实时任务中断 (⏹️ 停止任务)**：毫秒级杀灭底层生成子进程，即刻释放 GPU 显存。
 
 ---
 
@@ -70,7 +66,7 @@
 
 无需安装 Python，无需配置环境或下载 pip 依赖包，解压即用！
 
-1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.1-windows-x64-portable.zip`**；
+1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.3-windows-x64-portable.zip`**；
 2. 解压到电脑上的任意文件夹；
 3. 将下载好的模型放入 `models/` 对应子目录中（详见下方 [模型库与目录规范](#模型库与目录规范)）；
 4. 双击运行 **`start.bat`**（或 `Q-Spark.exe`）；

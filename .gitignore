@@ -43,3 +43,5 @@ ENV/
 python-embed.zip
 inputs/
 graphify-out/
+.data/
+crash.log

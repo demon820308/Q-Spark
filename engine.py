@@ -288,8 +288,11 @@ def get_system_metrics() -> dict:
 
     return {
         "vram": {"used": round(vram_u, 2), "total": round(vram_t, 1), "pct": round(vram_pct, 1)},
+        "vram_used": round(vram_u, 2),
+        "vram_total": round(vram_t, 1),
         "ram": {"used": round(ram_u, 1), "total": round(ram_t, 1), "pct": round(ram_pct, 1)},
         "cpu": {"pct": round(cpu_pct, 1)},
+        "active_task": getattr(engine, "current_task", None) if "engine" in globals() else None,
     }
 
 
@@ -307,6 +310,7 @@ class InferenceEngine:
         self.is_task_stopped = False
         self.server_port = 40189
         self.current_model_config = {}
+        self.current_task: Optional[dict] = None
 
     def get_status_text(self):
         is_running = self.server_process is not None and self.server_process.poll() is None
@@ -633,6 +637,19 @@ class InferenceEngine:
             out_filename = f"img_{int(time.time())}_{seed}.png"
             out_filepath = OUTPUTS_DIR / out_filename
 
+            self.current_task = {
+                "source": source,
+                "prompt": prompt,
+                "width": width,
+                "height": height,
+                "steps": steps,
+                "seed": seed,
+                "diff_model": diff_model,
+                "start_time": time.time(),
+                "pct": 0.05,
+                "desc": "初始化任务配置...",
+            }
+
             diff_path = resolve_model_file(["diffusion_models", "diffusion"], diff_model)
             te_path = resolve_model_file(["text_encoders", "text_encoder"], te_model)
             vae_path = resolve_model_file(["vae"], vae_model)
@@ -734,8 +751,6 @@ class InferenceEngine:
                 f"{lora_log}"
                 f"{ref_log}"
             )
-            yield {"pct": 0.05, "desc": "初始化任务配置...", "log": info_log}
-
             def _save_meta(out_fp: Path, current_diff: str):
                 dur = round(time.time() - start_time, 2)
                 meta = {
@@ -770,50 +785,76 @@ class InferenceEngine:
                     print(f"[Warning] 保存历史元数据失败: {ex}")
                 return meta
 
-            # 策略 A：按需冷启动模式 (流式输出 + 实时进度) 或者是图生图/参考图任务
-            if self.mode == "on_demand" or init_img_path or ref_img_paths:
-                async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
-                    yield event
-                if self.is_task_stopped:
-                    return
-                meta = _save_meta(out_filepath, diff_model)
-                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
-                return
+            def _update_task(ev):
+                if self.current_task and isinstance(ev, dict):
+                    if "pct" in ev:
+                        self.current_task["pct"] = ev["pct"]
+                    if "desc" in ev and ev.get("desc"):
+                        self.current_task["desc"] = ev["desc"]
 
-            # 策略 B & C：常驻或自动休眠模式
             try:
-                yield {"pct": 0.15, "desc": "准备常驻推理服务...", "log": ">>> 正在连接常驻模型服务...\n"}
-                await self.ensure_server(diff_model, te_model, vae_model, steps=steps, width=width, height=height)
-                yield {"pct": 0.45, "desc": "服务已就绪，正在进行 GPU 高速去噪...", "log": ">>> 开始发送生图任务...\n"}
-                async with httpx.AsyncClient(timeout=300.0) as client:
-                    resp = await client.post(
-                        f"http://127.0.0.1:{self.server_port}/v1/images/generations",
-                        json={
-                            "prompt": final_prompt,
-                            "size": f"{width}x{height}",
-                            "seed": seed,
-                            "response_format": "b64_json",
-                        },
-                    )
-                    if resp.status_code != 200:
-                        raise RuntimeError(f"sd-server 返回错误: {resp.text}")
-                    data = resp.json()
-                    b64_str = data["data"][0]["b64_json"]
-                    img_bytes = base64.b64decode(b64_str)
-                    with open(out_filepath, "wb") as f:
-                        f.write(img_bytes)
+                ev_init = {"pct": 0.05, "desc": "初始化任务配置...", "log": info_log}
+                _update_task(ev_init)
+                yield ev_init
+
+                # 策略 A：按需冷启动模式 (流式输出 + 实时进度) 或者是图生图/参考图任务
+                if self.mode == "on_demand" or init_img_path or ref_img_paths:
+                    async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
+                        _update_task(event)
+                        yield event
+                    if self.is_task_stopped:
+                        return
                     meta = _save_meta(out_filepath, diff_model)
-                    yield {"pct": 1.0, "desc": "生成完成！", "log": ">>> 图像已成功保存。\n", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
+                    ev_done = {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
+                    _update_task(ev_done)
+                    yield ev_done
                     return
-            except Exception as e:
-                print(f"\n[Warning] 常驻模式异常，正在降级回退至 sd-cli 流式执行: {e}\n")
-                self.stop_server()
-                async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
-                    yield event
-                if self.is_task_stopped:
-                    return
-                meta = _save_meta(out_filepath, diff_model)
-                yield {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
+
+                # 策略 B & C：常驻或自动休眠模式
+                try:
+                    ev_s1 = {"pct": 0.15, "desc": "准备常驻推理服务...", "log": ">>> 正在连接常驻模型服务...\n"}
+                    _update_task(ev_s1)
+                    yield ev_s1
+                    await self.ensure_server(diff_model, te_model, vae_model, steps=steps, width=width, height=height)
+                    ev_s2 = {"pct": 0.45, "desc": "服务已就绪，正在进行 GPU 高速去噪...", "log": ">>> 开始发送生图任务...\n"}
+                    _update_task(ev_s2)
+                    yield ev_s2
+                    async with httpx.AsyncClient(timeout=300.0) as client:
+                        resp = await client.post(
+                            f"http://127.0.0.1:{self.server_port}/v1/images/generations",
+                            json={
+                                "prompt": final_prompt,
+                                "size": f"{width}x{height}",
+                                "seed": seed,
+                                "response_format": "b64_json",
+                            },
+                        )
+                        if resp.status_code != 200:
+                            raise RuntimeError(f"sd-server 返回错误: {resp.text}")
+                        data = resp.json()
+                        b64_str = data["data"][0]["b64_json"]
+                        img_bytes = base64.b64decode(b64_str)
+                        with open(out_filepath, "wb") as f:
+                            f.write(img_bytes)
+                        meta = _save_meta(out_filepath, diff_model)
+                        ev_done = {"pct": 1.0, "desc": "生成完成！", "log": ">>> 图像已成功保存。\n", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
+                        _update_task(ev_done)
+                        yield ev_done
+                        return
+                except Exception as e:
+                    print(f"\n[Warning] 常驻模式异常，正在降级回退至 sd-cli 流式执行: {e}\n")
+                    self.stop_server()
+                    async for event in self._stream_sd_cli(cmd, cwd=BASE_DIR):
+                        _update_task(event)
+                        yield event
+                    if self.is_task_stopped:
+                        return
+                    meta = _save_meta(out_filepath, diff_model)
+                    ev_done = {"pct": 1.0, "desc": "完成！", "log": "", "out_path": str(out_filepath), "diff_model": diff_model, "metadata": meta}
+                    _update_task(ev_done)
+                    yield ev_done
+            finally:
+                self.current_task = None
 
     async def idle_checker_loop(self):
         while True:
