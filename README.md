@@ -3,7 +3,7 @@
   <h1>Q-Spark Studio</h1>
   <p><strong>High-performance, lightweight local AI image generation studio powered by stable-diffusion.cpp with OpenAI-compatible Agent API.</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.5</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.6</a> ·
     <a href="#key-features">Key Features</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#models-catalog">Models Catalog</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=Release" alt="Latest Release" /></a>
-    <img src="https://img.shields.io/badge/Version-v0.2.5-green" alt="Version v0.2.5" />
+    <img src="https://img.shields.io/badge/Version-v0.2.6-green" alt="Version v0.2.6" />
     <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/Engine-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ Engine" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,29 +31,28 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 ---
 
-## 🌟 Key Features in v0.2.5
+## 🌟 Key Features in v0.2.6
 
-### 1. 🛡️ Precise Architecture Conflict Diagnostics & True Error Reporting
+### 1. 🔌 Agent Generation Telemetry & Workspace Isolation
+- **Standard DALL-E API with SSE Streaming (`stream: true`)**: Keeps `/v1/images/generations` standard while providing typewriter-smooth progress events, correctly tagging gallery metadata as `🔌 OpenAI DALL-E API`.
+- **Live Terminal Step Feedback**: Real-time hardware spec, model initialization, sampling steps, and cost timing in terminal logs to prevent silent execution pauses.
+- **Cross-Drive Workspace Image Isolation**: Guarantees generated images land directly inside the caller agent's workspace `outputs/` folder, ensuring relative markdown links stay intact.
+
+### 2. 🎛️ Dual High / Low Resolution Aspect Ratio Presets
+- **Resolution Preset Switcher**: Toggle between Low (e.g. 1024x1024, 1360x768) and High (e.g. 2048x2048, 2752x1536) aspect ratio presets with one click.
+
+### 3. 🛡️ Precise Architecture Conflict Diagnostics & True Error Reporting
 - **Faithful C++ Crash Reproduction**: Accurately extracts the single core assertion or crash signature (e.g., `GGML_ASSERT(ggml_can_repeat)` or `scale_nelements`) from the underlying C++ process, eliminating swallowed errors and false positives.
 - **Dedicated NVFP4 Quantization Diagnostics**: Directly identifies non-standard NVFP4 2D block-scaled weights in raw FP8 models (failing on `scale_nelements`), pointing users directly to `Fix-convert` dequantization.
 - **Cross-Architecture Dimension Mismatch Checks**: Dissects hidden dimension conflicts between Z-Image (2048-dim) and Qwen-Image (3584-dim) text encoders with actionable suite-pairing advice.
 
-### 2. 🎨 VAE Compatibility A + B Dual Safeguard
+### 4. 🎨 VAE Compatibility A + B Dual Safeguard
 - **Layer A Pre-flight Warning**: Performs instant pre-flight checks before loading models; highlights cross-family VAE mismatches (e.g., Z-Image with Qwen VAE, or Qwen with Flux VAE) directly in the startup log.
 - **Layer B Runtime Exception Catch**: Catches latent decoder crashes and provides specific VAE swap instructions to prevent black or garbled images.
 
-### 3. 🖥️ Enhanced Live Telemetry & Log UX
-- **Expanded Log Buffer**: Increases live log retention to 120 lines so initial run configurations and pipeline stages (`[1/4]`, `[2/4]`) are never pushed out by subsequent output.
-- **Seamless Inline Error Rendering**: Renders diagnostic cards immediately beneath the failing stage without clearing existing execution context.
-
-### 4. 🔍 Hardware-Accelerated Image Super-Resolution (C++ Upscale Engine)
+### 5. 🔍 Hardware-Accelerated Image Super-Resolution (C++ Upscale Engine)
 - **Native C++ Tiled Upscaling**: Deeply integrated with `stable-diffusion.cpp -M upscale` engine, supporting 2x smooth fidelity and 4x ultra-resolution output in 1~2 seconds.
 - **Out-of-the-Box Bundled Model**: Bundles `4x-UltraSharp.pth` (~64MB) for instant out-of-the-box upscale; place any additional third-party models into `models/upscale_models` for automatic UI detection.
-- **Real-Time Tile Step Telemetry**: Sub-second console stream parsing of tile counts (`cur/total`), offering live visual progress bars in both the dedicated upscale tab and gallery modal.
-
-### 5. 🖼️ Gallery End-to-End Upscaling & Metadata Preservation
-- **1-Click Gallery Modal Upscaling**: Direct 2x / 4x upscale buttons with a compact model switcher dropdown, synchronizing hot-swapped models across tabs in real time.
-- **Generation Parameter Inheritance**: Preserves original generation metadata (Prompt, Negative Prompt, Seed, Steps, CFG, Base Model, LoRAs) while appending upscale model and scale tags, complete with dedicated gallery filtering.
 
 ---
 
@@ -63,7 +62,7 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 No Python installation required. No dependencies or build tools needed.
 
-1. Download **`Q-Spark-0.2.5-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
+1. Download **`Q-Spark-0.2.6-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
 2. Extract the archive to any folder on your computer.
 3. Download your preferred models and place them into the `models/` directory (see [Models Catalog](#models-catalog) below).
 4. Double-click **`start.bat`** (or `Q-Spark.exe`).
@@ -194,7 +193,6 @@ In your agent platform settings:
 Q-Spark includes a standard image generation skill designed for **ANY AI Agent, coding assistant, or agent framework**:
 
 * **Skill Directory**: [`skills/qspark/`](skills/qspark/) (contains `SKILL.md` capability manual & portable script `scripts/generate.py`)
-* **Workspace Spec Directory**: [`.agents/skills/qspark/`](.agents/skills/qspark/)
 
 ### Why Use the Skill Pattern?
 1. **Retain Reasoning LLM**: No need to swap your agent's reasoning model to an image generator; your agent continues using Claude 3.5 Sonnet, GPT-4o, or Gemini for high-level logic, calling Q-Spark only when artwork is needed.
@@ -211,7 +209,7 @@ Q-Spark includes a standard image generation skill designed for **ANY AI Agent, 
   ```powershell
   python "skills/qspark/scripts/generate.py" --prompt "cyberpunk cat, 8k resolution" --size "1360x768"
   ```
-- **Workspace Auto-Discovery**: In Antigravity or workspace-aware environments, `.agents/skills/qspark` is detected automatically without setup.
+- **In-Chat Self-Installation**: Ask your agent in chat to install `skills/qspark` into its skill directory.
 - **Global Installation (Machine-Wide across all projects)**:
   * **Windows**:
     ```powershell

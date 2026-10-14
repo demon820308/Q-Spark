@@ -236,12 +236,11 @@ def build_portable(version: str, output_dir: str):
         shutil.copytree(src_fix, os.path.join(build_dir, "Fix-convert"), dirs_exist_ok=True)
         log("Copied Fix-convert/ directory")
 
-    # 4.3 Copy Skills & Agent Customizations
-    for skill_dir in ["skills", ".agents"]:
-        src_s = os.path.join(root_dir, skill_dir)
-        if os.path.exists(src_s):
-            shutil.copytree(src_s, os.path.join(build_dir, skill_dir), dirs_exist_ok=True)
-            log(f"Copied {skill_dir}/ directory")
+    # 4.3 Copy Skills
+    src_skills = os.path.join(root_dir, "skills")
+    if os.path.exists(src_skills):
+        shutil.copytree(src_skills, os.path.join(build_dir, "skills"), dirs_exist_ok=True)
+        log("Copied skills/ directory")
 
     # 5. Create directories & bundle upscale models
     for sub in ["models/diffusion_models", "models/text_encoders", "models/vae", "models/loras", "models/upscale_models", "outputs", "outputs/json", "inputs"]:
@@ -295,7 +294,7 @@ def build_portable(version: str, output_dir: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="0.2.5", help="Release version (default: 0.2.5)")
+    parser.add_argument("--version", default="0.2.6", help="Release version (default: 0.2.6)")
     parser.add_argument("--output-dir", default=None, help="Output directory for zip")
     args = parser.parse_args()
 

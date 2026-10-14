@@ -188,10 +188,38 @@ textarea {
     min-height: 100px;
 }
 
-/* 比例药丸按钮网格 (5列) */
+/* 分辨率档位切换: 低分辨率 vs 高分辨率 */
+.res-toggle-group {
+    display: inline-flex;
+    gap: 4px;
+    background: var(--bg-subcard);
+    border: 1px solid var(--border-color);
+    padding: 2px 4px;
+    border-radius: 6px;
+}
+.res-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.res-toggle-btn:hover {
+    color: var(--text-primary);
+}
+.res-toggle-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+/* 比例药丸按钮网格 (4列) */
 .preset-radio-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 6px;
     margin-bottom: 12px;
 }

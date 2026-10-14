@@ -3,7 +3,7 @@
   <h1>Q-Spark 生图控制台</h1>
   <p><strong>基于 stable-diffusion.cpp C++ 原生引擎的轻量高性能本地 AI 生图工作室，支持兼容 OpenAI 的 Agent API。</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.5</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.6</a> ·
     <a href="#核心功能特性">核心特性</a> ·
     <a href="#快速上手">快速上手</a> ·
     <a href="#模型库与目录规范">模型库指引</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=%E7%89%88%E6%9C%AC" alt="最新版本" /></a>
-    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.5-green" alt="版本 v0.2.5" />
+    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.6-green" alt="版本 v0.2.6" />
     <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/%E5%BA%95%E5%B1%82%E5%BC%95%E6%93%8E-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ 引擎" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/%E5%BC%80%E6%BA%90%E5%8D%8F%E8%AE%AE-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -31,29 +31,28 @@
 
 ---
 
-## 🌟 v0.2.5 核心功能特性
+## 🌟 v0.2.6 核心功能特性
 
-### 1. 🛡️ 架构冲突精准排错与真实错误还原 (True Error Reporting)
+### 1. 🔌 Agent 生图全链路体验跃升 (流式进度 + 工作区隔离)
+- **标准 DALL-E 接口支持 SSE 流式 (`stream: true`)**：保持标准 `/v1/images/generations` 路径不变，同时提供平滑的打字机式实时推理进度反馈，画廊元数据严格标记为 `🔌 OpenAI DALL-E API`。
+- **Agent Skill 实时阶段提示**：智能体执行时输出真实硬件规格、模型初始化、真实采样去噪步数与生成耗时，彻底杜绝长时间执行黑盒静默卡顿。
+- **跨盘符工作区物理落地保障**：无论 Q-Spark 服务在何处运行，生成的图片实体均安全落盘至调用方 Agent 工作区的 `outputs/` 目录，杜绝 Markdown 图片链接失效。
+
+### 2. 🎛️ 画幅比例高/低分辨率双档位切换
+- **画幅比例快捷切换组**：在 Web 界面新增「低分辨率」与「高分辨率」两档预设，一键在标准清晰度（如 1024x1024, 1360x768）与高清超清画幅（如 2048x2048, 2752x1536）间无缝切换。
+
+### 3. 🛡️ 架构冲突精准排错与真实错误还原 (True Error Reporting)
 - **底层 C++ 报错真实还原**：当底层发生异常退出时，倒序精准提取真实断言行（如 `GGML_ASSERT(ggml_can_repeat)` 或 `scale_nelements`），彻底解决以往“吞没错误”或“张冠李戴误报”的痛点。
 - **NVFP4 非标量化精确诊断**：针对 Qwen 3.4B 原始 FP8 混量权重中的 NVFP4 微块量化层（`scale_nelements` 校验失败），提供精确的中文诊断与 `Fix-convert` 修复指引。
 - **跨架构维度不匹配智能诊断**：自动识别 Z-Image（2048 维）与 Qwen-Image-2.1（3584 维）文本编码器混用导致的张量广播冲突，给出清晰的成套搭配建议。
 
-### 2. 🎨 VAE 兼容性 A + B 双重保障
+### 4. 🎨 VAE 兼容性 A + B 双重保障
 - **Layer A 事前预检 (Pre-flight Warning)**：在启动 GPU 任务的第一秒，自动校验所选扩散主模型与 VAE 兼容性；若检测到跨体系错配（如 Z-Image 误选 Qwen VAE，或 Qwen 误选 Flux VAE），立即在日志中给出显眼警示。
 - **Layer B 事后异常捕获 (Runtime Catch)**：底层 VAE 解码器若发生崩溃，自动捕获专属异常并给出成套换回建议，彻底防止解码黑图或静默失败。
 
-### 3. 🖥️ 实时日志交互体验优化
-- **日志缓冲扩容**：终端日志缓冲容量由 30 行扩展至 120 行，确保前置任务规格与执行阶段步骤绝对不被顶出截断。
-- **紧凑追加渲染**：底层报错与排错诊断紧随失败步骤自然追加，不再清空或覆盖既有日志。
-
-### 4. 🔍 硬件加速图像超分辨率放大 (C++ Upscale Engine)
+### 5. 🔍 硬件加速图像超分辨率放大 (C++ Upscale Engine)
 - **原生 C++ 切块超分**：集成 `stable-diffusion.cpp -M upscale` 引擎，支持 2x 细腻平滑保真超分与 4x 极致超分辨率，1~2 秒内输出超清大图。
 - **开箱内置首选模型**：便携版开箱内置最优超分模型 `4x-UltraSharp.pth`（约 64MB），开箱即用；支持在 `models/upscale_models` 放入任意第三方超分模型，界面自动识别列出。
-- **分块切块 (Tile) 推理实时进度指示**：毫秒级解析底层控制台切块计数（如 `2/9`），独立超分工作区与画廊弹窗均配备动态进度条与运行状态指示。
-
-### 5. 🖼️ 历史画廊全链路超分闭环与元数据继承
-- **画廊弹窗一键放大**：画廊详情中直接提供 2x / 4x 放大入口，并配备紧凑的放大模型选择下拉框，两端模型切换双向实时同步。
-- **完美继承原始生成参数**：超分图片完整保留源图的 Prompt、负向词、种子、步数、CFG、模型架构与挂载 LoRA，仅追加放大模型与放大倍数，画廊卡片支持“🔍 图像超分放大”标签与筛选。
 
 ---
 
@@ -63,7 +62,7 @@
 
 无需安装 Python，无需配置环境或下载 pip 依赖包，解压即用！
 
-1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.5-windows-x64-portable.zip`**；
+1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.6-windows-x64-portable.zip`**；
 2. 解压到电脑上的任意文件夹；
 3. 将下载好的模型放入 `models/` 对应子目录中（详见下方 [模型库与目录规范](#模型库与目录规范)）；
 4. 双击运行 **`start.bat`**（或 `Q-Spark.exe`）；
@@ -193,7 +192,6 @@ print("生成图片地址:", resp["data"][0]["url"])
 Q-Spark 内置了**面向所有 AI Agent / 智能体 / 编码助手**的标准生图技能生态：
 
 * **核心技能包目录**：[`skills/qspark/`](skills/qspark/)（包含通用能力说明书 `SKILL.md` 与跨平台执行脚本 `scripts/generate.py`）
-* **项目工作区内嵌**：[`.agents/skills/qspark/`](.agents/skills/qspark/)
 
 ### 为什么所有 Agent 都推荐使用此 Skill？
 1. **保留大模型思考大脑**：不用把 Agent 的主模型硬切为生图模型，Agent 依然使用 Claude、GPT-4o、Gemini 等强推理大模型写代码、拆解任务，仅在需要插图时把 Q-Spark 当作画笔工具；
@@ -211,8 +209,7 @@ Q-Spark 内置了**面向所有 AI Agent / 智能体 / 编码助手**的标准�
   ```powershell
   python "skills/qspark/scripts/generate.py" --prompt "赛博朋克风格机甲猫咪，8k超清" --size "1360x768"
   ```
-* **工作区自动发现**：在克隆或打开本项目时，智能体环境会自动发现 `.agents/skills/qspark`，无需任何配置，直接对 Agent 说：
-  > *“帮我画一张赛博朋克夜景插图，16:9”*
+* **对话中直接让 Agent 安装**：在 Agent 对话中输入提示词，让其自动将 `skills/qspark` 复制/安装到其技能目录中。
 * **全局安装（跨所有项目随时可用）**：
   * **Windows**：
     ```powershell

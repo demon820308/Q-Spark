@@ -131,6 +131,13 @@ def compute_aspect_ratio_str(width: int, height: int) -> str:
         (1360, 768): "16:9",
         (1248, 832): "3:2",
         (1536, 640): "21:9",
+        (2048, 2048): "1:1",
+        (2400, 1792): "4:3",
+        (1792, 2400): "3:4",
+        (2528, 1696): "3:2",
+        (1696, 2528): "2:3",
+        (2752, 1536): "16:9",
+        (1536, 2752): "9:16",
     }
     if (width, height) in presets:
         return presets[(width, height)]
@@ -448,7 +455,7 @@ class InferenceEngine:
                         current_pct = 0.30 + 0.10 * (cur / tot)
                         current_desc = f"加载 DiT 降噪主模型 ({int(cur / tot * 100)}%)..."
                         web_log = f"[2/4] 🧩 载入 DiT 降噪主模型 ({int(cur / tot * 100)}%)...\n"
-                    elif stage == 3:
+                    elif stage == 3 and ("it/s" in line or "s/it" in line):
                         current_pct = 0.40 + 0.50 * (cur / tot)
                         current_desc = f"采样去噪进行中 ({cur}/{tot} 步)..."
                         web_log = f"[3/4] ⚡ GPU 扩散去噪采样中 ({cur}/{tot} 步)...\n"

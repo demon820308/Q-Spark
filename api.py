@@ -61,8 +61,8 @@ def _extract_from_text(text: Optional[str]) -> Optional[tuple[int, int]]:
         try:
             w = int(m_dim.group(1))
             h = int(m_dim.group(2))
-            w = max(256, min(2048, round(w / 16) * 16))
-            h = max(256, min(2048, round(h / 16) * 16))
+            w = max(256, min(4096, round(w / 16) * 16))
+            h = max(256, min(4096, round(h / 16) * 16))
             return w, h
         except Exception:
             pass
@@ -97,9 +97,9 @@ class OpenAIGenRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
     prompt: str
     size: Optional[str] = "1024x1024"
-    n: Optional[int] = 1
     response_format: Optional[str] = "url"
-    steps: Optional[int] = DEFAULT_STEPS
+    steps: Optional[int] = None
+    stream: Optional[bool] = False
 
 
 class OpenAIChatRequest(BaseModel):
@@ -114,7 +114,7 @@ class UIGenerateRequest(BaseModel):
     prompt: str
     width: Optional[int] = 1024
     height: Optional[int] = 1024
-    steps: Optional[int] = 8
+    steps: Optional[int] = None
     seed: Optional[int] = -1
     policy: Optional[str] = "on_demand"
     diff_model: Optional[str] = None
@@ -403,6 +403,46 @@ async def openai_images_generations(req: OpenAIGenRequest):
     start_t = time.time()
     out_path = None
     actual_diff_model = APP_CONFIG.get("api_diff_model", "")
+
+    if req.stream:
+        async def dalle_stream_generator():
+            nonlocal out_path, actual_diff_model
+            try:
+                async for event in engine.generate_image_stream(
+                    prompt=req.prompt, width=w, height=h, steps=req.steps, source="api_dalle"
+                ):
+                    payload = {
+                        "pct": event.get("pct", 0.0),
+                        "desc": event.get("desc", ""),
+                    }
+                    log_chunk = event.get("log", "")
+                    if log_chunk:
+                        payload["log"] = ANSI_REGEX.sub("", log_chunk)
+
+                    if "out_path" in event:
+                        out_path = event["out_path"]
+                        filename = os.path.basename(out_path)
+                        actual_diff_model = event.get("diff_model", actual_diff_model)
+                        payload["image_url"] = f"http://127.0.0.1:40188/outputs/{filename}"
+                        payload["out_path"] = out_path
+                        payload["diff_model"] = actual_diff_model
+                        payload["cost"] = round(time.time() - start_t, 2)
+                        if req.response_format == "b64_json":
+                            try:
+                                with open(out_path, "rb") as f:
+                                    payload["b64_json"] = base64.b64encode(f.read()).decode("utf-8")
+                            except Exception:
+                                pass
+
+                    yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(dalle_stream_generator(), media_type="text/event-stream")
+
     try:
         async for event in engine.generate_image_stream(
             prompt=req.prompt, width=w, height=h, steps=req.steps, source="api_dalle"

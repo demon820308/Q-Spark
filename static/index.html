@@ -127,19 +127,14 @@
             </div>
 
             <div class="form-group">
-                <label>画幅比例快捷预设（直接点击切换）</label>
-                <div class="preset-radio-grid" id="preset-container">
-                    <div class="preset-pill active" data-w="1024" data-h="1024">1:1 (1024x1024)</div>
-                    <div class="preset-pill" data-w="768" data-h="1024">3:4 (768x1024)</div>
-                    <div class="preset-pill" data-w="864" data-h="1152">3:4 (864x1152)</div>
-                    <div class="preset-pill" data-w="768" data-h="1360">9:16 (768x1360)</div>
-                    <div class="preset-pill" data-w="832" data-h="1248">2:3 (832x1248)</div>
-                    <div class="preset-pill" data-w="1024" data-h="768">4:3 (1024x768)</div>
-                    <div class="preset-pill" data-w="1360" data-h="768">16:9 (1360x768)</div>
-                    <div class="preset-pill" data-w="1248" data-h="832">3:2 (1248x832)</div>
-                    <div class="preset-pill" data-w="1536" data-h="640">21:9 (1536x640)</div>
-                    <div class="preset-pill" data-w="512" data-h="512">1:1 (512x512)</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="margin-bottom: 0;">画幅比例快捷预设</label>
+                    <div class="res-toggle-group">
+                        <button type="button" class="res-toggle-btn active" data-res="low">低分辨率</button>
+                        <button type="button" class="res-toggle-btn" data-res="high">高分辨率</button>
+                    </div>
                 </div>
+                <div class="preset-radio-grid" id="preset-container"></div>
             </div>
 
             <!-- 高级设置手风琴 -->
@@ -844,15 +839,70 @@
 
         document.getElementById('diff-select').addEventListener('change', updateStepsSuggestion);
 
-        // 药丸预设切换
-        document.querySelectorAll('.preset-pill').forEach(pill => {
-            pill.addEventListener('click', () => {
-                document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
-                pill.classList.add('active');
-                currentW = parseInt(pill.dataset.w);
-                currentH = parseInt(pill.dataset.h);
+        // 画幅比例预设管理 (低分辨率 / 高分辨率)
+        const PRESET_GROUPS = {
+            low: [
+                { ratio: "1:1", w: 1024, h: 1024 },
+                { ratio: "4:3", w: 1024, h: 768 },
+                { ratio: "3:4", w: 768, h: 1024 },
+                { ratio: "3:2", w: 1248, h: 832 },
+                { ratio: "2:3", w: 832, h: 1248 },
+                { ratio: "16:9", w: 1360, h: 768 },
+                { ratio: "9:16", w: 768, h: 1360 },
+                { ratio: "21:9", w: 1536, h: 640 }
+            ],
+            high: [
+                { ratio: "1:1", w: 2048, h: 2048 },
+                { ratio: "4:3", w: 2400, h: 1792 },
+                { ratio: "3:4", w: 1792, h: 2400 },
+                { ratio: "3:2", w: 2528, h: 1696 },
+                { ratio: "2:3", w: 1696, h: 2528 },
+                { ratio: "16:9", w: 2752, h: 1536 },
+                { ratio: "9:16", w: 1536, h: 2752 }
+            ]
+        };
+        let currentResMode = 'low';
+        let currentRatio = '1:1';
+
+        function renderPresets(mode = currentResMode, preferredRatio = currentRatio) {
+            currentResMode = mode;
+            document.querySelectorAll('.res-toggle-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.res === mode);
+            });
+            const list = PRESET_GROUPS[mode] || PRESET_GROUPS.low;
+            const target = list.find(item => item.ratio === preferredRatio) || list[0];
+            currentRatio = target.ratio;
+            currentW = target.w;
+            currentH = target.h;
+
+            const container = document.getElementById('preset-container');
+            if (!container) return;
+            container.innerHTML = list.map(item => `
+                <div class="preset-pill ${item.ratio === currentRatio ? 'active' : ''}" data-w="${item.w}" data-h="${item.h}" data-ratio="${item.ratio}">
+                    ${item.ratio} (${item.w}x${item.h})
+                </div>
+            `).join('');
+
+            container.querySelectorAll('.preset-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    container.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
+                    pill.classList.add('active');
+                    currentRatio = pill.dataset.ratio;
+                    currentW = parseInt(pill.dataset.w);
+                    currentH = parseInt(pill.dataset.h);
+                });
+            });
+        }
+
+        document.querySelectorAll('.res-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.res !== currentResMode) {
+                    renderPresets(btn.dataset.res, currentRatio);
+                }
             });
         });
+
+        renderPresets('low', '1:1');
 
         // 模型下载说明文档弹窗
         async function openDocModal() {
@@ -1766,13 +1816,15 @@
             if (item.width && item.height) {
                 currentW = item.width;
                 currentH = item.height;
-                document.querySelectorAll('.preset-pill').forEach(pill => {
-                    if (parseInt(pill.dataset.w) === currentW && parseInt(pill.dataset.h) === currentH) {
-                        pill.classList.add('active');
-                    } else {
-                        pill.classList.remove('active');
-                    }
-                });
+                const inHigh = PRESET_GROUPS.high.find(p => p.w === currentW && p.h === currentH);
+                const inLow = PRESET_GROUPS.low.find(p => p.w === currentW && p.h === currentH);
+                if (inHigh) {
+                    renderPresets('high', inHigh.ratio);
+                } else if (inLow) {
+                    renderPresets('low', inLow.ratio);
+                } else {
+                    document.querySelectorAll('.preset-pill').forEach(pill => pill.classList.remove('active'));
+                }
             }
 
             if (item.steps) document.getElementById('steps-input').value = item.steps;
