@@ -60,4 +60,18 @@
 
 ---
 
+### ⚡ 套装五：Krea-2 Turbo 体系（Krea AI 12B 单流 MMDiT 极速版）
+*Krea AI 官方开源的 12B 级美学图像生成模型，支持 8 步蒸馏快速出图，推荐步数 8 步，采样器 `euler`，调度器 `simple`。*
+
+| 组件 | 文件名 | 存放子目录 | 下载页面 | 镜像直链 |
+| :--- | :--- | :--- | :--- | :--- |
+| **降噪主模型 (INT8)** | `krea2_turbo_int8_convrot.safetensors` (推荐) | `diffusion_models/` | [HF官方](https://huggingface.co/Comfy-Org/Krea-2) | [国内镜像](https://modelscope.cn/models/Comfy-Org/Krea-2) |
+| **降噪主模型 (FP8)** | `krea2_turbo_fp8_scaled.safetensors` | `diffusion_models/` | [HF官方](https://huggingface.co/Comfy-Org/Krea-2) | [国内镜像](https://modelscope.cn/models/Comfy-Org/Krea-2) |
+| **文本编码器** | `qwen3vl_4b_int8_convrot.safetensors` (系统自动静默对齐) | `text_encoders/` | [HF官方](https://huggingface.co/Comfy-Org/Krea-2) | [国内镜像](https://modelscope.cn/models/Comfy-Org/Krea-2) |
+| **变分自编码器** | `qwen_image_vae.safetensors` | `vae/` | [HF官方](https://huggingface.co/Comfy-Org/Krea-2) | [国内镜像](https://modelscope.cn/models/Comfy-Org/Krea-2) |
+
+> 💡 **Qwen3-VL 自动适配说明**：原版从 HuggingFace / ModelScope 下载的 `qwen3vl_4b` 文本编码器，本项目引擎在首次点击生成时会自动毫秒级对齐键名并缓存为 `_fixed` 版本，无需手动做任何文件转换。
+
+---
+
 > 💡 **提示**：下载放置完成后，点击上方的 **「🔄 重新扫描模型」** 按钮，新模型即可立刻出现在下方下拉选择框中。

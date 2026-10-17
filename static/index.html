@@ -164,7 +164,12 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="vae-select">变分自编码器 (vae)</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label for="vae-select" style="margin-bottom: 0;">变分自编码器 (vae)</label>
+                            <span id="open-model-guide-btn" style="color: #f59e0b; cursor: pointer; font-size: 0.82rem; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;" title="点击查看不同模型成套搭配指南">
+                                ⚠️ [模型搭配预警]：<u style="text-underline-offset: 3px;">模型搭配指南</u>
+                            </span>
+                        </div>
                         <select id="vae-select"></select>
                     </div>
 
@@ -556,6 +561,244 @@
         </div>
     </div>
 
+    <!-- 模型搭配指南弹窗 (方案一：成套卡片流 · 优化防变形排版) -->
+    <div id="model-guide-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 980px; width: 95%; max-height: 88vh; display: flex; flex-direction: column; padding: 0; background: #1a1816; border: 1px solid #38332d; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);">
+            <!-- 弹窗 Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid #332f2b; background: #211e1b; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.25); display: flex; align-items: center; justify-content: center; font-size: 1.05rem;">
+                        ⚠️
+                    </div>
+                    <div>
+                        <div style="font-size: 1.05rem; font-weight: 600; color: #f3f4f6; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            模型成套搭配指南与防翻车速查表
+                            <span style="font-size: 0.72rem; font-weight: normal; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.25); white-space: nowrap;">已实装自动对齐</span>
+                        </div>
+                        <div style="font-size: 0.78rem; color: #9ca3af; margin-top: 2px;">
+                            不同体系的 DiT、文本编码器与 VAE 严禁跨代混插，请按成套组合选取
+                        </div>
+                    </div>
+                </div>
+                <button id="model-guide-close-btn" class="btn-secondary" style="padding: 4px 12px; font-size: 0.86rem; cursor: pointer; border-radius: 8px; white-space: nowrap;">✕ 关闭</button>
+            </div>
+
+            <!-- 弹窗主体内容滚动区 -->
+            <div style="padding: 18px 22px 24px 22px; overflow-y: auto; flex: 1; font-size: 0.88rem; line-height: 1.6;">
+                
+                <!-- 顶部极速避坑告示条 -->
+                <div style="background: linear-gradient(90deg, rgba(120, 53, 15, 0.35) 0%, rgba(38, 31, 24, 0.6) 60%, transparent 100%); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;">
+                    <span style="font-size: 1.1rem; line-height: 1.2;">⚡</span>
+                    <div style="font-size: 0.82rem; color: #fde68a; line-height: 1.55;">
+                        <strong style="color: #fbbf24;">两大致命防翻车原则：</strong><br>
+                        ① <strong>Z-Image 属于 Flux 体系</strong>，切勿选用 Qwen VAE，否则花屏乱码；<br>
+                        ② <strong>Qwen-Image / Krea-2 属于 Qwen 体系</strong>，切勿选用 Flux VAE (<code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 4px; color: #fcd34d;">ae.safetensors</code>)，否则出纯黑图！
+                    </div>
+                </div>
+
+                <!-- 6大体系成套卡片网格 -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px;">
+                    
+                    <!-- 卡片 1: Z-Image Turbo -->
+                    <div style="background: #221f1c; border: 1px solid #38332d; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <span style="font-size: 1.15rem; flex-shrink: 0;">🎨</span>
+                                <span style="font-weight: 700; font-size: 0.95rem; color: #60a5fa; white-space: nowrap;">Z-Image Turbo</span>
+                                <span style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.12); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.25); padding: 1px 6px; border-radius: 8px; white-space: nowrap;">极速写真</span>
+                            </div>
+                            <span style="font-size: 0.72rem; color: #9ca3af; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); white-space: nowrap; flex-shrink: 0;">8~9 步 · simple</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 主模 DiT:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="z_image_turbo_*.safetensors">z_image_turbo_*.safetensors</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 编码 TE:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen_3_4b_fp8_mixed_fixed / qwen_3_4b">qwen_3_4b_fp8_mixed_fixed / qwen_3_4b</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 解码 VAE:</span>
+                                <code style="font-family: monospace; background: rgba(6, 78, 59, 0.3); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 7px; border-radius: 4px; color: #6ee7b7; flex: 1; font-weight: 600; display: flex; justify-content: space-between; align-items: center; white-space: nowrap;">
+                                    <span>ae.safetensors</span>
+                                    <span style="font-size: 0.7rem; font-weight: normal; color: #34d399; margin-left: 6px;">Flux专属</span>
+                                </code>
+                            </div>
+                        </div>
+                        <div style="border-top: 1px solid #2e2a25; padding-top: 8px; font-size: 0.74rem; color: #9ca3af;">
+                            💡 提示：属于 Flux 架构分支，切勿误选 Qwen VAE，否则爆彩花屏。
+                        </div>
+                    </div>
+
+                    <!-- 卡片 2: Krea-2 Turbo -->
+                    <div style="background: #221f1c; border: 1px solid #38332d; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <span style="font-size: 1.15rem; flex-shrink: 0;">⚡</span>
+                                <span style="font-weight: 700; font-size: 0.95rem; color: #c084fc; white-space: nowrap;">Krea-2 Turbo</span>
+                                <span style="font-size: 0.68rem; background: rgba(192, 132, 252, 0.12); color: #d8b4fe; border: 1px solid rgba(192, 132, 252, 0.25); padding: 1px 6px; border-radius: 8px; white-space: nowrap;">电影级质感</span>
+                            </div>
+                            <span style="font-size: 0.72rem; color: #9ca3af; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); white-space: nowrap; flex-shrink: 0;">8 步 · simple</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 主模 DiT:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="krea2_turbo_*.safetensors">krea2_turbo_*.safetensors</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 编码 TE:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen3vl_4b_int8_*fixed">
+                                    qwen3vl_4b_int8_*fixed <span style="color: #34d399; font-size: 0.7rem;">(自动对齐)</span>
+                                </code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 解码 VAE:</span>
+                                <code style="font-family: monospace; background: rgba(6, 78, 59, 0.3); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 7px; border-radius: 4px; color: #6ee7b7; flex: 1; font-weight: 600; display: flex; justify-content: space-between; align-items: center; white-space: nowrap;">
+                                    <span>qwen_image_vae.safetensors</span>
+                                    <span style="font-size: 0.7rem; font-weight: normal; color: #fbbf24; margin-left: 6px;">严禁配 ae</span>
+                                </code>
+                            </div>
+                        </div>
+                        <div style="border-top: 1px solid #2e2a25; padding-top: 8px; font-size: 0.74rem; color: #9ca3af;">
+                            💡 提示：搭配 INT8 文本编码器显存占用减半，编码仅耗时 2.6 秒。
+                        </div>
+                    </div>
+
+                    <!-- 卡片 3: Qwen-Image 2.1 (Turbo) -->
+                    <div style="background: #221f1c; border: 1px solid #38332d; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <span style="font-size: 1.15rem; flex-shrink: 0;">🌟</span>
+                                <span style="font-weight: 700; font-size: 0.95rem; color: #f472b6; white-space: nowrap;">Qwen 2.1 Turbo</span>
+                                <span style="font-size: 0.68rem; background: rgba(244, 114, 182, 0.12); color: #fbcfe8; border: 1px solid rgba(244, 114, 182, 0.25); padding: 1px 6px; border-radius: 8px; white-space: nowrap;">8步精修</span>
+                            </div>
+                            <span style="font-size: 0.72rem; color: #fde68a; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;">8 步 · Turbo 曲线</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 主模 DiT:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Qwen-Image-2.1-Turbo-*">Qwen-Image-2.1-Turbo-*</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 编码 TE:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Qwen-Turbo-*AD-Q4_K / qwen3vl_8b">Qwen-Turbo-*AD-Q4_K / qwen3vl_8b</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 解码 VAE:</span>
+                                <code style="font-family: monospace; background: rgba(6, 78, 59, 0.3); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 7px; border-radius: 4px; color: #6ee7b7; flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen_image_2.1_vae_bf16 (推荐) 或 qwen_image_vae">qwen_image_2.1_vae_bf16 / qwen_image_vae</code>
+                            </div>
+                        </div>
+                        <div style="border-top: 1px solid #2e2a25; padding-top: 8px; font-size: 0.74rem; color: #9ca3af;">
+                            💡 提示：系统已内置官方 8 步 Turbo 曲线，采样器设为 simple 即可激活。
+                        </div>
+                    </div>
+
+                    <!-- 卡片 4: Qwen-Image Viggle 6步 -->
+                    <div style="background: #221f1c; border: 1px solid #38332d; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <span style="font-size: 1.15rem; flex-shrink: 0;">🚀</span>
+                                <span style="font-weight: 700; font-size: 0.95rem; color: #fb7185; white-space: nowrap;">Qwen Viggle</span>
+                                <span style="font-size: 0.68rem; background: rgba(251, 113, 133, 0.12); color: #fecdd3; border: 1px solid rgba(251, 113, 133, 0.25); padding: 1px 6px; border-radius: 8px; white-space: nowrap;">6步极速</span>
+                            </div>
+                            <span style="font-size: 0.72rem; color: #fb7185; background: rgba(251,113,133,0.12); border: 1px solid rgba(251,113,133,0.25); padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;">6 步 · Viggle Sigmas</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 主模 DiT:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Qwen-Image-2.1-viggle-*-6step-*">Qwen-Image-2.1-viggle-*-6step-*</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 编码 TE:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen3vl_8b_int8_convrot">qwen3vl_8b_int8_convrot</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 解码 VAE:</span>
+                                <code style="font-family: monospace; background: rgba(6, 78, 59, 0.3); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 7px; border-radius: 4px; color: #6ee7b7; flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen_image_2.1_vae_bf16 / qwen_image_vae">qwen_image_2.1_vae_bf16 / qwen_image_vae</code>
+                            </div>
+                        </div>
+                        <div style="border-top: 1px solid #2e2a25; padding-top: 8px; font-size: 0.74rem; color: #9ca3af;">
+                            💡 提示：步数必须严格设为 6，系统会自动注入 Viggle 特别蒸馏调度。
+                        </div>
+                    </div>
+
+                    <!-- 卡片 5: Qwen-Image UC 基模 -->
+                    <div style="background: #221f1c; border: 1px solid #38332d; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <span style="font-size: 1.15rem; flex-shrink: 0;">🔥</span>
+                                <span style="font-weight: 700; font-size: 0.95rem; color: #fbbf24; white-space: nowrap;">Qwen UC 原版基模</span>
+                                <span style="font-size: 0.68rem; background: rgba(251, 191, 36, 0.12); color: #fde68a; border: 1px solid rgba(251, 191, 36, 0.25); padding: 1px 6px; border-radius: 8px; white-space: nowrap;">超高画质</span>
+                            </div>
+                            <span style="font-size: 0.72rem; color: #fde68a; background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.25); padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;">20~25 步 · CFG 3.0</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 主模 DiT:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen-image-2.1-UC-*">qwen-image-2.1-UC-*</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 编码 TE:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen3vl_8b_int8_convrot">qwen3vl_8b_int8_convrot</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 解码 VAE:</span>
+                                <code style="font-family: monospace; background: rgba(6, 78, 59, 0.3); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 7px; border-radius: 4px; color: #6ee7b7; flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="qwen_image_2.1_vae_bf16">qwen_image_2.1_vae_bf16</code>
+                            </div>
+                        </div>
+                        <div style="border-top: 1px solid #2e2a25; padding-top: 8px; font-size: 0.74rem; color: #9ca3af;">
+                            💡 提示：原生非 Turbo 模型，不可使用 8 步极速曲线，需给足 20~25 步。
+                        </div>
+                    </div>
+
+                    <!-- 卡片 6: Flux.1 / Flux.2 -->
+                    <div style="background: #221f1c; border: 1px solid #38332d; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <span style="font-size: 1.15rem; flex-shrink: 0;">💎</span>
+                                <span style="font-weight: 700; font-size: 0.95rem; color: #38bdf8; white-space: nowrap;">Flux.1 / Flux.2</span>
+                                <span style="font-size: 0.68rem; background: rgba(56, 189, 248, 0.12); color: #bae6fd; border: 1px solid rgba(56, 189, 248, 0.25); padding: 1px 6px; border-radius: 8px; white-space: nowrap;">经典原版</span>
+                            </div>
+                            <span style="font-size: 0.72rem; color: #38bdf8; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.25); padding: 2px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;">20~28步 / 4步(schnell)</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 主模 DiT:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="flux1-dev / schnell / flux2">flux1-dev / schnell / flux2</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 编码 TE:</span>
+                                <code style="font-family: monospace; background: #161514; border: 1px solid rgba(255,255,255,0.06); padding: 2px 7px; border-radius: 4px; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="t5xxl + clip_l">t5xxl + clip_l</code>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="width: 66px; color: #9ca3af; flex-shrink: 0; white-space: nowrap;">● 解码 VAE:</span>
+                                <code style="font-family: monospace; background: rgba(6, 78, 59, 0.3); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 7px; border-radius: 4px; color: #6ee7b7; flex: 1; font-weight: 600; display: flex; justify-content: space-between; align-items: center; white-space: nowrap;">
+                                    <span>ae.safetensors</span>
+                                    <span style="font-size: 0.7rem; font-weight: normal; color: #34d399; margin-left: 6px;">Flux专属</span>
+                                </code>
+                            </div>
+                        </div>
+                        <div style="border-top: 1px solid #2e2a25; padding-top: 8px; font-size: 0.74rem; color: #9ca3af;">
+                            💡 提示：双编码器架构，支持标准 ae.safetensors 解码。
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- 弹窗 Footer -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 22px; border-top: 1px solid #332f2b; background: #211e1b; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #9ca3af;">
+                    <span style="color: #34d399; font-weight: bold;">●</span>
+                    <span>系统状态：已启用文本编码器毫秒级自动对齐转换，无需手动运行修复脚本。</span>
+                </div>
+                <button id="model-guide-ok-btn" class="btn-coral" style="width: auto !important; max-width: 130px; padding: 6px 20px; font-size: 0.84rem; cursor: pointer; border-radius: 8px; white-space: nowrap; margin: 0;">我知道了</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 前端交互逻辑 -->
     <script>
         let currentW = 1024;
@@ -930,6 +1173,24 @@
         document.getElementById('doc-modal-close-btn')?.addEventListener('click', closeDocModal);
         document.getElementById('doc-modal')?.addEventListener('click', (e) => {
             if (e.target.id === 'doc-modal') closeDocModal();
+        });
+
+        // 模型搭配指南弹窗
+        function openModelGuideModal() {
+            const modal = document.getElementById('model-guide-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeModelGuideModal() {
+            const modal = document.getElementById('model-guide-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        document.getElementById('open-model-guide-btn')?.addEventListener('click', openModelGuideModal);
+        document.getElementById('model-guide-close-btn')?.addEventListener('click', closeModelGuideModal);
+        document.getElementById('model-guide-ok-btn')?.addEventListener('click', closeModelGuideModal);
+        document.getElementById('model-guide-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'model-guide-modal') closeModelGuideModal();
         });
 
         // 切换并重新扫描选中的预设目录
@@ -1764,6 +2025,11 @@
                 const docModal = document.getElementById('doc-modal');
                 if (docModal && docModal.classList.contains('active')) {
                     closeDocModal();
+                    return;
+                }
+                const guideModal = document.getElementById('model-guide-modal');
+                if (guideModal && guideModal.classList.contains('active')) {
+                    closeModelGuideModal();
                     return;
                 }
                 const modal = document.getElementById('gallery-modal');

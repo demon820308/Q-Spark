@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Version tag to release (e.g. v0.2.4)'
+        description: 'Version tag to release (e.g. v0.2.7)'
         required: true
-        default: 'v0.2.4'
+        default: 'v0.2.7'
 
 permissions:
   contents: write
@@ -51,17 +51,16 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: Q-Spark ${{ steps.release_info.outputs.tag }} - Windows x64 Portable
           body: |
-            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 原生桌面守护宿主与 Agent 监控看板
+            ## ⚡ Q-Spark ${{ steps.release_info.outputs.tag }} - 文本编码器静默自愈、Krea-2 Turbo 体系支持与可视化模型指南
 
             基于 `stable-diffusion.cpp` C++ 原生引擎构建的轻量、极速本地生图工作室，内置兼容 OpenAI 的 Agent 生图接口与即插即用 Agent Skill。
 
             ### 🚀 ${{ steps.release_info.outputs.tag }} 重磅升级 (Highlights)
-            - **🔌 Agent 生图全链路体验跃升**：标准 `/v1/images/generations` 全面升级支持 SSE 流式 (`stream: true`)，元数据统一标记为 `🔌 OpenAI DALL-E API`。
-            - **⏳ Agent 执行全阶段实时流式反馈**：生图时向控制台流式输出硬件规格、环境初始化、真实采样去噪步数及推理耗时，彻底杜绝长时间执行黑盒静默卡顿。
-            - **📁 跨盘符工作区物理落地保障**：无论服务端部署在何处，生成的图片实体均安全落盘至调用方 Agent 工作区的 `outputs/` 目录，杜绝 Markdown 图片链接失效。
-            - **🎛️ 画幅比例高/低分辨率双档位切换**：Web 界面新增「低分辨率」与「高分辨率」两档预设，一键在标准清晰度与超清画幅间无缝切换。
-            - **🔧 真实采样步数解析修复**：修复底层 Stage 3 进度误解析张量吞吐（14/14 步）的缺陷，准确反映真实去噪步数。
-            - **🛡️ 架构冲突精准排错与 VAE A+B 保障**：底层 C++ 崩溃真实还原、NVFP4 非标量化精确诊断、Layer A 事前预检 + Layer B 事后异常捕获。
+            - **🧠 Qwen3-VL 文本编码器毫秒级静默自动对齐**：智能读取 safetensors 头部元数据（无需完整载入权重），自动识别 HuggingFace 原生 `model.language_model.` 键名并瞬时规范化生成兼容版 `_fixed.safetensors`，彻底告别 C++ 引擎报错，用户零心智负担。
+            - **⚡ Krea-2 Turbo 体系全新原生支持**：全面支持 Krea AI 12B 单流 MMDiT 极速版（8步 Euler / simple 采样），原生集成 Qwen3-VL 4B 文本编码器与专用 VAE 解码器。
+            - **📖 Web 控制台「模型搭配指南」可视化面板**：导航栏新增交互式模型搭配指南，以清晰卡片直观呈现主流体系（Qwen 2.1 Turbo GGUF、Qwen 2.1 UC INT8、Krea-2 Turbo、Z-Image Turbo、Qwen 原生版、Flux.1/2）的 DiT、TE、VAE 专属组合与步数建议。
+            - **🎯 Turbo 调度策略精确优化与张量智能诊断**：解耦并精确区分 Qwen 2.1 专属 sigma 曲线与通用 Turbo / Viggle 调度逻辑；新增张量命名规范缺失的精确中文排错引导。
+            - **🛠️ Fix-convert 兼容性工具箱扩充**：新增 `convert_qwen3vl.py` 及 `一键修复_Qwen3VL.bat` 离线拖拽转换脚本，满足离线预处理与批量分发需求。
 
             ### 📦 便携版特性 (Portable Highlights)
             - **零依赖开箱即用**：内置轻量独立 Python 3.12 绿色运行时与所有依赖，无需在系统中另外安装 Python！

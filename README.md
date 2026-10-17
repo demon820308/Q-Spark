@@ -3,7 +3,7 @@
   <h1>Q-Spark Studio</h1>
   <p><strong>High-performance, lightweight local AI image generation studio powered by stable-diffusion.cpp with OpenAI-compatible Agent API.</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.6</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">Download Portable v0.2.7</a> ·
     <a href="#key-features">Key Features</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#models-catalog">Models Catalog</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=Release" alt="Latest Release" /></a>
-    <img src="https://img.shields.io/badge/Version-v0.2.6-green" alt="Version v0.2.6" />
+    <img src="https://img.shields.io/badge/Version-v0.2.7-green" alt="Version v0.2.7" />
     <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/Engine-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ Engine" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -25,34 +25,32 @@
 
 | 🚀 Blazing Fast & Uncensored | 🎨 Creation & Upscale Pipeline | 🔌 Agent & Workflow Ready |
 | :--- | :--- | :--- |
-| **Qwen-Image-2.1-Turbo** & **Z-Image Turbo** local inference. Native pure C++ GGML CUDA engine running comfortably on 8~10GB GPUs (RTX 3060 / 3080 / 4060). | Seamless integration of **Text-to-Image**, **Instruction Editing**, and **C++ Hardware-Accelerated Upscaling (2x/4x)** with real-time tile tracking and infinite drag-to-pan preview. | Standard OpenAI-compatible `/v1/images/generations` HTTP API for Dify, Cherry Studio, Chatbox, and multi-agent workflows. |
+| **Qwen-Image-2.1-Turbo**, **Krea-2 Turbo** & **Z-Image Turbo** local inference. Native pure C++ GGML CUDA engine running comfortably on 8~10GB GPUs (RTX 3060 / 3080 / 4060). | Seamless integration of **Text-to-Image**, **Instruction Editing**, and **C++ Hardware-Accelerated Upscaling (2x/4x)** with real-time tile tracking and infinite drag-to-pan preview. | Standard OpenAI-compatible `/v1/images/generations` HTTP API for Dify, Cherry Studio, Chatbox, and multi-agent workflows. |
 
 Local workflows run 100% on your own hardware. Zero telemetry, zero cloud dependency, complete privacy.
 
 ---
 
-## 🌟 Key Features in v0.2.6
+## 🌟 Key Features in v0.2.7
 
-### 1. 🔌 Agent Generation Telemetry & Workspace Isolation
-- **Standard DALL-E API with SSE Streaming (`stream: true`)**: Keeps `/v1/images/generations` standard while providing typewriter-smooth progress events, correctly tagging gallery metadata as `🔌 OpenAI DALL-E API`.
-- **Live Terminal Step Feedback**: Real-time hardware spec, model initialization, sampling steps, and cost timing in terminal logs to prevent silent execution pauses.
-- **Cross-Drive Workspace Image Isolation**: Guarantees generated images land directly inside the caller agent's workspace `outputs/` folder, ensuring relative markdown links stay intact.
+### 1. 🧠 Qwen3-VL Text Encoder Millisecond Auto-Alignment (Self-Healing)
+- **Zero-Friction Zero-Crash Pipeline**: Reads safetensors header JSON metadata in milliseconds (without loading full weights into memory); automatically detects raw HuggingFace `model.language_model.` key prefixes.
+- **Silent On-the-Fly Normalization**: Automatically converts and caches `_fixed.safetensors` on first run, eliminating `embed_tokens.weight not in model metadata` assertion crashes with zero user intervention.
 
-### 2. 🎛️ Dual High / Low Resolution Aspect Ratio Presets
-- **Resolution Preset Switcher**: Toggle between Low (e.g. 1024x1024, 1360x768) and High (e.g. 2048x2048, 2752x1536) aspect ratio presets with one click.
+### 2. ⚡ Krea-2 Turbo Architecture Native Support (12B MMDiT)
+- **High-Aesthetic 12B Foundation**: Full native support for Krea AI's official open-source 12B single-stream MMDiT (`krea2_turbo_int8_convrot.safetensors`).
+- **Rapid 8-Step Distillation**: Out-of-the-box support for 8-step Euler / simple schedule, natively paired with auto-aligned `qwen3vl_4b_int8_convrot.safetensors` and `qwen_image_vae.safetensors`.
 
-### 3. 🛡️ Precise Architecture Conflict Diagnostics & True Error Reporting
-- **Faithful C++ Crash Reproduction**: Accurately extracts the single core assertion or crash signature (e.g., `GGML_ASSERT(ggml_can_repeat)` or `scale_nelements`) from the underlying C++ process, eliminating swallowed errors and false positives.
-- **Dedicated NVFP4 Quantization Diagnostics**: Directly identifies non-standard NVFP4 2D block-scaled weights in raw FP8 models (failing on `scale_nelements`), pointing users directly to `Fix-convert` dequantization.
-- **Cross-Architecture Dimension Mismatch Checks**: Dissects hidden dimension conflicts between Z-Image (2048-dim) and Qwen-Image (3584-dim) text encoders with actionable suite-pairing advice.
+### 3. 📖 Visual Interactive "Model Matching Guide" Modal
+- **Direct Web UI Integration**: Instant one-click guide accessible directly from the top navigation bar.
+- **Card-Based Recipe Cards**: Visually displays recipes and step suggestions across 6 mainstream suites: Qwen 2.1 Turbo GGUF, Qwen 2.1 UC INT8, Krea-2 Turbo, Z-Image Turbo, Qwen 2.1 Native, and Flux.1/2.
 
-### 4. 🎨 VAE Compatibility A + B Dual Safeguard
-- **Layer A Pre-flight Warning**: Performs instant pre-flight checks before loading models; highlights cross-family VAE mismatches (e.g., Z-Image with Qwen VAE, or Qwen with Flux VAE) directly in the startup log.
-- **Layer B Runtime Exception Catch**: Catches latent decoder crashes and provides specific VAE swap instructions to prevent black or garbled images.
+### 4. 🎯 Precision Turbo Scheduling & Tensor Diagnostics
+- **Decoupled Sigma Curves**: Isolates Qwen 2.1 specific 8-step sigmas from other Turbo models (such as Krea-2 and Viggle) to ensure optimal sampling fidelity.
+- **Smart Tensor Metadata Diagnostics**: Catches non-standard tensor naming and immediately outputs precise pairing and fix advice.
 
-### 5. 🔍 Hardware-Accelerated Image Super-Resolution (C++ Upscale Engine)
-- **Native C++ Tiled Upscaling**: Deeply integrated with `stable-diffusion.cpp -M upscale` engine, supporting 2x smooth fidelity and 4x ultra-resolution output in 1~2 seconds.
-- **Out-of-the-Box Bundled Model**: Bundles `4x-UltraSharp.pth` (~64MB) for instant out-of-the-box upscale; place any additional third-party models into `models/upscale_models` for automatic UI detection.
+### 5. 🛠️ Fix-convert Tool Suite Expansion
+- **Stand-alone Offline Conversion**: Added `Fix-convert/convert_qwen3vl.py` and `一键修复_Qwen3VL.bat` for offline drag-and-drop batch conversion and redistribution.
 
 ---
 
@@ -62,7 +60,7 @@ Local workflows run 100% on your own hardware. Zero telemetry, zero cloud depend
 
 No Python installation required. No dependencies or build tools needed.
 
-1. Download **`Q-Spark-0.2.6-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
+1. Download **`Q-Spark-0.2.7-windows-x64-portable.zip`** from [Releases](https://github.com/demon820308/Q-Spark/releases).
 2. Extract the archive to any folder on your computer.
 3. Download your preferred models and place them into the `models/` directory (see [Models Catalog](#models-catalog) below).
 4. Double-click **`start.bat`** (or `Q-Spark.exe`).
@@ -150,6 +148,16 @@ models/
 >   3. The script outputs `qwen_3_4b_fp8_mixed_fixed.safetensors` in the same folder;
 >   4. Copy the fixed file to `models/text_encoders/`.
 
+#### ⚡ Preset 5: Krea-2 Turbo Architecture (Krea AI 12B DiT)
+*Official open-source 12B aesthetic model, fast 8-step generation with Euler sampler and simple schedule.*
+
+| Component | File Name | Destination | Download Links |
+| :--- | :--- | :--- | :--- |
+| **Diffusion Model** | `krea2_turbo_int8_convrot.safetensors` | `models/diffusion_models/` | [HuggingFace](https://huggingface.co/Comfy-Org/Krea-2) \| [Mirror (CN)](https://hf-mirror.com/Comfy-Org/Krea-2) |
+| **Text Encoder** | `qwen3vl_4b_int8_convrot.safetensors` (Auto-aligned) | `models/text_encoders/` | [HuggingFace](https://huggingface.co/Comfy-Org/Krea-2) \| [Mirror (CN)](https://hf-mirror.com/Comfy-Org/Krea-2) |
+| **VAE** | `qwen_image_vae.safetensors` | `models/vae/` | [HuggingFace](https://huggingface.co/Comfy-Org/Krea-2) \| [Mirror (CN)](https://hf-mirror.com/Comfy-Org/Krea-2) |
+
+> 💡 **Qwen3-VL Automatic Compatibility**: Raw `qwen3vl_4b` text encoders downloaded from HuggingFace are automatically detected and converted to `_fixed` compatible weights upon first run—no manual conversion required.
 
 ---
 

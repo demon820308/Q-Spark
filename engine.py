@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 import json
+import struct
 import httpx
 import psutil
 
@@ -205,6 +206,56 @@ def resolve_model_file(subfolder_names: list[str], filename: str) -> Path:
             if candidate.exists():
                 return candidate
     return MODELS_DIR / subfolder_names[0] / filename
+
+
+def ensure_text_encoder_compatible(te_path: Path) -> Path:
+    """毫秒级检测并静默对齐 Qwen3-VL 等文本编码器的张量键名规范 (去除 model.language_model. 前缀)"""
+    if not te_path.exists() or te_path.suffix.lower() != ".safetensors":
+        return te_path
+
+    # 1. 毫秒级读取 safetensors 头部 JSON 元数据 (仅读取 header，不加载权重)
+    try:
+        with open(te_path, "rb") as f:
+            header_len = struct.unpack("<Q", f.read(8))[0]
+            if header_len > 50 * 1024 * 1024:
+                return te_path
+            header = json.loads(f.read(header_len).decode("utf-8"))
+            needs_rename = any(k.startswith("model.language_model.") for k in header.keys())
+    except Exception:
+        return te_path
+
+    if not needs_rename:
+        return te_path
+
+    # 2. 检查是否已经存在对齐后的 _fixed 文件
+    fixed_path = te_path.with_name(f"{te_path.stem}_fixed.safetensors")
+    if fixed_path.exists():
+        return fixed_path
+
+    # 3. 仅首次遇到未对齐模型时，自动静默生成 _fixed 版本
+    print(f"\n[自动适配] 检测到 {te_path.name} 包含 HuggingFace 原生键名，正在自动对齐为 C++ 引擎标准规范...")
+    try:
+        import safetensors
+        from safetensors.torch import save_file
+
+        with safetensors.safe_open(str(te_path), framework="pt") as f:
+            meta = f.metadata() or {}
+            tensors = {}
+            for k in f.keys():
+                new_k = k
+                if new_k.startswith("model.language_model."):
+                    new_k = "model." + new_k[len("model.language_model."):]
+                elif new_k.startswith("model.visual."):
+                    new_k = "visual." + new_k[len("model.visual."):]
+                elif new_k.startswith("lm_head."):
+                    new_k = "model.lm_head." + new_k[len("lm_head."):]
+                tensors[new_k] = f.get_tensor(k)
+            save_file(tensors, str(fixed_path), metadata=meta)
+        print(f"[自动适配] 成功生成兼容版模型: {fixed_path.name}，后续任务将直接调用。\n")
+        return fixed_path
+    except Exception as ex:
+        print(f"[Warning] 自动适配文本编码器失败: {ex}")
+        return te_path
 
 
 def resolve_vision_projector(root: Optional[Path] = None) -> Optional[Path]:
@@ -405,7 +456,13 @@ class InferenceEngine:
             return (
                 "\n💡 【排错诊断】：VAE 模型与主架构不匹配！\n"
                 "👉 原因：当前扩散主模型无法兼容所选 VAE 解码器权重。\n"
-                "👉 解决：Z-Image 请搭配 ae.safetensors；Qwen-Image 请搭配 qwen_image_2.1_vae_bf16.safetensors。\n"
+                "👉 解决：Z-Image 请搭配 ae.safetensors；Qwen-Image / Krea 请搭配 qwen_image_vae.safetensors。\n"
+            )
+        if "embed_tokens.weight" in err_text or "not in model metadata" in err_text or "model metadata validation failed" in err_text:
+            return (
+                "\n💡 【排错诊断】：文本编码器张量命名不兼容（缺少 model. 前缀）！\n"
+                "👉 原因：当前选用的文本编码器带有 HuggingFace 原生 model.language_model. 前缀，C++ 引擎无法直接读取。\n"
+                "👉 解决：系统已内置自动静默适配，或可选用已修复的 fixed 版本（如 qwen3vl_4b_int8_fixed.safetensors）。\n"
             )
         return ""
 
@@ -544,6 +601,7 @@ class InferenceEngine:
 
         diff_path = resolve_model_file(["diffusion_models", "diffusion"], diff_model)
         te_path = resolve_model_file(["text_encoders", "text_encoder"], te_model)
+        te_path = ensure_text_encoder_compatible(te_path)
         vae_path = resolve_model_file(["vae"], vae_model)
 
         cmd = [
@@ -560,9 +618,10 @@ class InferenceEngine:
             "--diffusion-fa",
         ]
         is_turbo = "turbo" in diff_path.name.lower() or "6step" in diff_path.name.lower() or "viggle" in diff_path.name.lower()
+        is_qwen_21 = "qwen-image-2.1" in diff_path.name.lower().replace("_", "-") or ("qwen" in diff_path.name.lower() and "image" in diff_path.name.lower())
         if is_turbo and target_steps == 6:
             cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
-        elif is_turbo and target_steps == 8 and "z_image" not in diff_path.name.lower():
+        elif is_qwen_21 and target_steps == 8:
             cmd.extend(["--sigmas", TURBO_SIGMAS])
 
         self.server_process = subprocess.Popen(cmd, cwd=str(BASE_DIR))
@@ -696,6 +755,8 @@ class InferenceEngine:
 
             diff_path = resolve_model_file(["diffusion_models", "diffusion"], diff_model)
             te_path = resolve_model_file(["text_encoders", "text_encoder"], te_model)
+            te_path = ensure_text_encoder_compatible(te_path)
+            effective_te_model = te_path.name
             vae_path = resolve_model_file(["vae"], vae_model)
             lora_dir = get_sub_dir(MODELS_DIR, ["loras", "lora"])
 
@@ -759,9 +820,10 @@ class InferenceEngine:
                 mode_log = ">>> 任务模式: 🎨 文生图 (txt2img)\n"
 
             is_turbo = "turbo" in diff_path.name.lower() or "6step" in diff_path.name.lower() or "viggle" in diff_path.name.lower()
+            is_qwen_21 = "qwen-image-2.1" in diff_path.name.lower().replace("_", "-") or ("qwen" in diff_path.name.lower() and "image" in diff_path.name.lower())
             if is_turbo and steps == 6:
                 cmd.extend(["--sigmas", get_viggle_6step_sigmas(width, height)])
-            elif is_turbo and steps == 8 and "z_image" not in diff_path.name.lower():
+            elif is_qwen_21 and steps == 8:
                 cmd.extend(["--sigmas", TURBO_SIGMAS])
 
             policy_map = {
@@ -785,23 +847,13 @@ class InferenceEngine:
             if ref_img_paths and not is_txt2img_mode:
                 ref_log = f">>> 挂载视觉参考图 ({len(ref_img_paths)} 张): {', '.join(f'<image{i+1}>: {p.name}' for i, p in enumerate(ref_img_paths))}\n"
 
-            # VAE 架构兼容性事前预检 (Pre-flight 双重保障 Layer A)
-            vae_warn = ""
-            d_low = (diff_model or "").lower()
-            v_low = (vae_model or "").lower()
-            if "z_image" in d_low and "qwen" in v_low:
-                vae_warn = "⚠️ [VAE 搭配预警]：Z-Image 属于 Flux 体系，当前搭配了 Qwen VAE，可能导致解码异常或花屏！推荐搭配: ae.safetensors\n"
-            elif "qwen" in d_low and ("ae." in v_low or "flux" in v_low):
-                vae_warn = "⚠️ [VAE 搭配预警]：Qwen-Image 需专属 VAE，当前搭配了 Flux VAE (ae)，可能导致解码异常！推荐搭配: qwen_image_2.1_vae_bf16.safetensors\n"
-
             info_log = (
                 f"{mode_log}"
                 f">>> 任务规格: {width}x{height} | 采样步数: {steps} | CFG: {effective_cfg} | 随机种子: {seed}\n"
                 f">>> 显存策略: {policy_text}\n"
                 f">>> 扩散模型: {diff_model}\n"
-                f">>> 文本编码: {te_model}\n"
+                f">>> 文本编码: {effective_te_model}\n"
                 f">>> VAE 解码: {vae_model}\n"
-                f"{vae_warn}"
                 f"{lora_log}"
                 f"{ref_log}"
             )
@@ -821,7 +873,7 @@ class InferenceEngine:
                     "height": height,
                     "aspect_ratio": compute_aspect_ratio_str(width, height),
                     "diff_model": current_diff,
-                    "te_model": te_model,
+                    "te_model": effective_te_model,
                     "vae_model": vae_model,
                     "loras": loras or [],
                     "vram_mode": self.mode,

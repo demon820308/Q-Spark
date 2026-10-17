@@ -3,7 +3,7 @@
   <h1>Q-Spark 生图控制台</h1>
   <p><strong>基于 stable-diffusion.cpp C++ 原生引擎的轻量高性能本地 AI 生图工作室，支持兼容 OpenAI 的 Agent API。</strong></p>
   <p>
-    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.6</a> ·
+    <a href="https://github.com/demon820308/Q-Spark/releases/latest">下载便携版 v0.2.7</a> ·
     <a href="#核心功能特性">核心特性</a> ·
     <a href="#快速上手">快速上手</a> ·
     <a href="#模型库与目录规范">模型库指引</a> ·
@@ -12,7 +12,7 @@
   </p>
   <p>
     <a href="https://github.com/demon820308/Q-Spark/releases/latest"><img src="https://img.shields.io/github/v/release/demon820308/Q-Spark?color=orange&label=%E7%89%88%E6%9C%AC" alt="最新版本" /></a>
-    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.6-green" alt="版本 v0.2.6" />
+    <img src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v0.2.7-green" alt="版本 v0.2.7" />
     <img src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20x64-blue" alt="Windows x64" />
     <img src="https://img.shields.io/badge/%E5%BA%95%E5%B1%82%E5%BC%95%E6%93%8E-stable--diffusion.cpp%20(GGML%2FCUDA)-brightgreen" alt="C++ 引擎" />
     <a href="LICENSE"><img src="https://img.shields.io/badge/%E5%BC%80%E6%BA%90%E5%8D%8F%E8%AE%AE-Apache--2.0-blue" alt="Apache-2.0" /></a>
@@ -25,34 +25,32 @@
 
 | 🚀 秒级极速 · 自由无审查 | 🎨 创作与超分全链路合一 | 🔌 智能体与工作流无缝连接 |
 | :--- | :--- | :--- |
-| **Qwen-Image-2.1-Turbo** 与 **Z-Image Turbo** 原生本地推理，纯 C++ 底层 GGML/CUDA 架构，主流游戏显卡（8~10G 卡）极速流畅运行。 | 融合**文生图**、**指令编辑**与 **C++ 硬件加速高清超分放大 (2x/4x)**，内置切块进度检测与无损大图拖拽漫游。 | 完整兼容 OpenAI 标准 `/v1/images/generations` HTTP API，完美打通 Dify、Cherry Studio、Chatbox 等 AI 智能体生态。 |
+| **Qwen-Image-2.1-Turbo**、**Krea-2 Turbo** 与 **Z-Image Turbo** 原生本地推理，纯 C++ 底层 GGML/CUDA 架构，主流游戏显卡（8~10G 卡）极速流畅运行。 | 融合**文生图**、**指令编辑**与 **C++ 硬件加速高清超分放大 (2x/4x)**，内置切块进度检测与无损大图拖拽漫游。 | 完整兼容 OpenAI 标准 `/v1/images/generations` HTTP API，完美打通 Dify、Cherry Studio、Chatbox 等 AI 智能体生态。 |
 
 本地工作流 100% 在您自己的硬件上运行。零数据外发、零云端依赖、隐私安全。
 
 ---
 
-## 🌟 v0.2.6 核心功能特性
+## 🌟 v0.2.7 核心功能特性
 
-### 1. 🔌 Agent 生图全链路体验跃升 (流式进度 + 工作区隔离)
-- **标准 DALL-E 接口支持 SSE 流式 (`stream: true`)**：保持标准 `/v1/images/generations` 路径不变，同时提供平滑的打字机式实时推理进度反馈，画廊元数据严格标记为 `🔌 OpenAI DALL-E API`。
-- **Agent Skill 实时阶段提示**：智能体执行时输出真实硬件规格、模型初始化、真实采样去噪步数与生成耗时，彻底杜绝长时间执行黑盒静默卡顿。
-- **跨盘符工作区物理落地保障**：无论 Q-Spark 服务在何处运行，生成的图片实体均安全落盘至调用方 Agent 工作区的 `outputs/` 目录，杜绝 Markdown 图片链接失效。
+### 1. 🧠 Qwen3-VL 文本编码器毫秒级静默自动对齐 (Self-Healing)
+- **毫秒级头部元数据解析**：仅读取 safetensors 头部 JSON 元数据，不加载全量权重；瞬间识别 HuggingFace 原生 `model.language_model.` 键名前缀。
+- **完全静默平滑对齐**：首次运行自动对齐并缓存生成 `_fixed.safetensors` 标准模型，彻底杜绝 `embed_tokens.weight` 校验缺失导致的底层 C++ 崩溃，用户零心智负担。
 
-### 2. 🎛️ 画幅比例高/低分辨率双档位切换
-- **画幅比例快捷切换组**：在 Web 界面新增「低分辨率」与「高分辨率」两档预设，一键在标准清晰度（如 1024x1024, 1360x768）与高清超清画幅（如 2048x2048, 2752x1536）间无缝切换。
+### 2. ⚡ Krea-2 Turbo 体系全新原生支持 (12B MMDiT)
+- **高审美 12B 开源基底**：原生支持 Krea AI 官方开源的 12B 单流 MMDiT 主模（`krea2_turbo_int8_convrot.safetensors`）。
+- **极速 8 步蒸馏出图**：开箱即用 8 步 Euler / simple 采样曲线，原生集成 Qwen3-VL 4B 文本编码器与专用 VAE 解码器。
 
-### 3. 🛡️ 架构冲突精准排错与真实错误还原 (True Error Reporting)
-- **底层 C++ 报错真实还原**：当底层发生异常退出时，倒序精准提取真实断言行（如 `GGML_ASSERT(ggml_can_repeat)` 或 `scale_nelements`），彻底解决以往“吞没错误”或“张冠李戴误报”的痛点。
-- **NVFP4 非标量化精确诊断**：针对 Qwen 3.4B 原始 FP8 混量权重中的 NVFP4 微块量化层（`scale_nelements` 校验失败），提供精确的中文诊断与 `Fix-convert` 修复指引。
-- **跨架构维度不匹配智能诊断**：自动识别 Z-Image（2048 维）与 Qwen-Image-2.1（3584 维）文本编码器混用导致的张量广播冲突，给出清晰的成套搭配建议。
+### 3. 📖 Web 控制台「模型搭配指南」可视化面板
+- **控制台顶部一键直达**：主界面顶部导航栏新增「📖 说明文档」/ 模型搭配指南快捷弹窗。
+- **卡片式成套搭配指引**：清晰梳理 6 大主流推荐套装（Qwen 2.1 Turbo GGUF、Qwen 2.1 UC INT8、Krea-2 Turbo、Z-Image Turbo、Qwen 2.1 原生版、Flux.1/2 经典版）的 DiT、TE、VAE 搭配要求与专属步数建议。
 
-### 4. 🎨 VAE 兼容性 A + B 双重保障
-- **Layer A 事前预检 (Pre-flight Warning)**：在启动 GPU 任务的第一秒，自动校验所选扩散主模型与 VAE 兼容性；若检测到跨体系错配（如 Z-Image 误选 Qwen VAE，或 Qwen 误选 Flux VAE），立即在日志中给出显眼警示。
-- **Layer B 事后异常捕获 (Runtime Catch)**：底层 VAE 解码器若发生崩溃，自动捕获专属异常并给出成套换回建议，彻底防止解码黑图或静默失败。
+### 4. 🎯 Turbo 调度策略精确优化与张量智能诊断
+- **专属 Sigma 解耦**：解耦并精确区分 Qwen 2.1 专属 8 步曲线与通用 Turbo / Viggle 调度逻辑，避免采样曲线错配。
+- **张量规范缺失排错指引**：底层发生张量名称不匹配时，自动给出直观的中文诊断与 fixed 版替换指引。
 
-### 5. 🔍 硬件加速图像超分辨率放大 (C++ Upscale Engine)
-- **原生 C++ 切块超分**：集成 `stable-diffusion.cpp -M upscale` 引擎，支持 2x 细腻平滑保真超分与 4x 极致超分辨率，1~2 秒内输出超清大图。
-- **开箱内置首选模型**：便携版开箱内置最优超分模型 `4x-UltraSharp.pth`（约 64MB），开箱即用；支持在 `models/upscale_models` 放入任意第三方超分模型，界面自动识别列出。
+### 5. 🛠️ Fix-convert 兼容性工具箱扩充
+- **新增 Qwen3-VL 一键修复脚本**：包含独立 Python 脚本 `Fix-convert/convert_qwen3vl.py` 及拖拽即转批处理 `一键修复_Qwen3VL.bat`，满足离线预处理与批量分发需求。
 
 ---
 
@@ -62,7 +60,7 @@
 
 无需安装 Python，无需配置环境或下载 pip 依赖包，解压即用！
 
-1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.6-windows-x64-portable.zip`**；
+1. 在 [Releases 发布页面](https://github.com/demon820308/Q-Spark/releases) 下载 **`Q-Spark-0.2.7-windows-x64-portable.zip`**；
 2. 解压到电脑上的任意文件夹；
 3. 将下载好的模型放入 `models/` 对应子目录中（详见下方 [模型库与目录规范](#模型库与目录规范)）；
 4. 双击运行 **`start.bat`**（或 `Q-Spark.exe`）；
@@ -150,6 +148,16 @@ models/
 >   3. 稍候片刻，同目录下会自动生成修复后的 `qwen_3_4b_fp8_mixed_fixed.safetensors`；
 >   4. 将生成的文件放入 `models/text_encoders/` 目录中即可直接在控制台调用。
 
+#### ⚡ 套装五：Krea-2 Turbo 体系（Krea AI 12B 单流 MMDiT 极速版）
+*Krea AI 官方开源的 12B 美学模型，支持 8 步快速出图，推荐步数 8 步，采样器 `euler`，调度器 `simple`。*
+
+| 组件 | 推荐文件名 | 放置子目录 | 下载渠道（含国内镜像） |
+| :--- | :--- | :--- | :--- |
+| **降噪主模型** | `krea2_turbo_int8_convrot.safetensors` (推荐) | `models/diffusion_models/` | [HF官方](https://huggingface.co/Comfy-Org/Krea-2) \| [国内镜像](https://modelscope.cn/models/Comfy-Org/Krea-2) |
+| **文本编码器** | `qwen3vl_4b_int8_convrot.safetensors` (系统自动静默对齐) | `models/text_encoders/` | [HF官方](https://huggingface.co/Comfy-Org/Krea-2) \| [国内镜像](https://modelscope.cn/models/Comfy-Org/Krea-2) |
+| **变分自编码器** | `qwen_image_vae.safetensors` | `models/vae/` | [HF官方](https://huggingface.co/Comfy-Org/Krea-2) \| [国内镜像](https://modelscope.cn/models/Comfy-Org/Krea-2) |
+
+> 💡 **Qwen3-VL 自动适配说明**：从 HuggingFace / ModelScope 下载的原生 `qwen3vl_4b` 文本编码器，引擎在首次点击生成时会自动毫秒级对齐键名并缓存为 `_fixed` 兼容版，无需手动做任何文件转换。
 
 ---
 

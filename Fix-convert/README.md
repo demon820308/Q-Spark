@@ -1,8 +1,13 @@
-# Z-Image Qwen 3 4B FP8 Mixed 模型修复工具
+# 模型兼容性修复工具箱 (Fix-convert)
 
-本工具专门针对 **z-image** 的 `qwen_3_4b_fp8_mixed.safetensors` 文本编码器模型进行修复。
+本工具箱提供针对非标 safetensors 模型的兼容性修复工具：
+1. **NVFP4 非标量化还原**：修复 Z-Image 的 `qwen_3_4b_fp8_mixed.safetensors`；
+2. **Qwen3-VL 键名规范对齐**：对齐 HuggingFace 原生 `qwen3vl_4b/8b` 文本编码器规范。
 
 ---
+
+## 🛠️ 工具一：Z-Image Qwen 3 4B FP8 Mixed 非标 NVFP4 修复
+
 
 ### 问题背景
 原始模型中的部分网络层使用了 **NVFP4 2D 分块非标量化**（带有 `.comfy_quant` 与 `weight_scale_2`）。这会导致在很多标准推理框架或旧版环境中加载报错、识别异常或无法直接使用。
@@ -34,3 +39,19 @@
 - **显卡**：NVIDIA GPU（反量化过程需调用 CUDA）。
 - **Python 环境**：需要安装有 `torch`、`safetensors` 以及 `comfy_kitchen`。
   - 脚本默认会自动匹配检测 ComfyUI 的内置 Python 环境（`python_embeded`）。
+
+---
+
+## 🛠️ 工具二：Qwen3-VL 文本编码器 HuggingFace 键名规范对齐 (`convert_qwen3vl.py` / `一键修复_Qwen3VL.bat`)
+
+### 问题背景
+从 HuggingFace / ModelScope 下载的原生 `qwen3vl_4b_int8_convrot.safetensors` 等文本编码器，其权重包含原生 `model.language_model.` 前缀。纯 C++ 推理引擎（`stable-diffusion.cpp`）期望以 `model.` 开头的标准键名，直接加载会导致张量元数据校验失败。
+
+> 💡 **自动适配提示**：在 Q-Spark v0.2.7 及更高版本中，服务在生图前会自动检测并毫秒级静默生成 `_fixed.safetensors`，无需任何手动操作。本离线工具专为需要预先处理、批量分发或在第三方环境运行的用户提供。
+
+### 使用方法
+- **拖拽修复**：直接将任意 `qwen3vl_*.safetensors` 模型拖拽投放到 `一键修复_Qwen3VL.bat` 上，脚本将在同目录自动生成对齐后的 `*_fixed.safetensors` 文件；
+- **命令行调用**：
+  ```bash
+  python convert_qwen3vl.py path/to/qwen3vl_4b_int8_convrot.safetensors
+  ```
